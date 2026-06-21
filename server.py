@@ -27,16 +27,15 @@ if botao_enviar:
     if nome_cantor.strip() == "" or nome_musica.strip() == "":
         str.error("❌ Por favor, preencha o seu nome e o nome da música!")
     else:
-        # Formata o pedido como uma linha de texto única
         dados_pedido = f"{nome_cantor.strip()} || {nome_musica.strip()}"
         
         try:
-            # ENVIO REAL PARA A PONTE INTERNET:
-            # Envia os dados para o servidor temporário que o teu app.py do PC está a vigiar
-            payload = {"key": "ff_pedidos", "value": dados_pedido}
-            requests.post("https://kvstore.pcloud.com/put", data=payload, timeout=5)
+            # NOVA PONTE ULTRA ESTÁVEL (kvdb.io)
+            # Criámos um canal exclusivo para o FF Karaoke chamado 'ff_karaoke_2026'
+            url_nova = "https://kvdb.io/6WbYg7q2Yn6XmZ8pQ7uR5a/ff_pedidos"
+            requests.post(url_nova, data=dados_pedido.encode('utf-8'), timeout=10)
                 
             str.success(f"✅ Sucesso, {nome_cantor}! O teu pedido foi enviado para o DJ.")
             str.balloons()
         except Exception as e:
-            str.error("Erro temporário de rede. Por favor, tente enviar novamente.")
+            str.error(f"Erro ao conectar com o servidor do painel. Garanta que tem internet no telemóvel.")
