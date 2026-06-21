@@ -27,15 +27,19 @@ if botao_enviar:
     if nome_cantor.strip() == "" or nome_musica.strip() == "":
         str.error("❌ Por favor, preencha o seu nome e o nome da música!")
     else:
+        # Formata o pedido com a separação que o computador espera
         dados_pedido = f"{nome_cantor.strip()} || {nome_musica.strip()}"
         
         try:
-            # NOVA PONTE ULTRA ESTÁVEL (kvdb.io)
-            # Criámos um canal exclusivo para o FF Karaoke chamado 'ff_karaoke_2026'
-            url_nova = "https://kvdb.io/6WbYg7q2Yn6XmZ8pQ7uR5a/ff_pedidos"
-            requests.post(url_nova, data=dados_pedido.encode('utf-8'), timeout=10)
-                
-            str.success(f"✅ Sucesso, {nome_cantor}! O teu pedido foi enviado para o DJ.")
-            str.balloons()
+            # Envia para a ponte estável na nuvem (usando text/plain para evitar erros de formato)
+            url_ponte = "https://kvdb.io/6WbYg7q2Yn6XmZ8pQ7uR5a/ff_pedidos"
+            headers = {'Content-Type': 'text/plain'}
+            resposta = requests.post(url_ponte, data=dados_pedido.encode('utf-8'), headers=headers, timeout=10)
+            
+            if resposta.status_code in [200, 201]:
+                str.success(f"✅ Sucesso, {nome_cantor}! O teu pedido foi enviado para o DJ.")
+                str.balloons()
+            else:
+                str.error(f"Erro no servidor: {resposta.status_code}. Tenta novamente.")
         except Exception as e:
-            str.error(f"Erro ao conectar com o servidor do painel. Garanta que tem internet no telemóvel.")
+            str.error("Erro de ligação. Garanta que o telemóvel tem internet ativa.")
