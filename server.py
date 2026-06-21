@@ -1,4 +1,5 @@
 import streamlit as str
+from sqlalchemy import text  # Importação necessária para corrigir o erro
 
 # Configuração da página do telemóvel do cliente
 str.set_page_config(page_title="FF KARAOKE - Pedir Música", page_icon="🎤", layout="centered")
@@ -18,9 +19,9 @@ str.write("---")
 # Liga à base de dados interna do Streamlit
 conn = str.connection("pedidos_db", type="sql")
 
-# Cria a tabela se não existir
+# Cria a tabela se não existir (usando text() para evitar o erro de ArgumentError)
 with conn.session as session:
-    session.execute("CREATE TABLE IF NOT EXISTS karaoke_pedidos (id INTEGER PRIMARY KEY AUTOINCREMENT, cantor TEXT, musica TEXT);")
+    session.execute(text("CREATE TABLE IF NOT EXISTS karaoke_pedidos (id INTEGER PRIMARY KEY AUTOINCREMENT, cantor TEXT, musica TEXT);"))
     session.commit()
 
 with str.form(key="form_pedido"):
@@ -34,7 +35,7 @@ if botao_enviar:
     else:
         with conn.session as session:
             session.execute(
-                "INSERT INTO karaoke_pedidos (cantor, musica) VALUES (:cantor, :musica);",
+                text("INSERT INTO karaoke_pedidos (cantor, musica) VALUES (:cantor, :musica);"),
                 {"cantor": nome_cantor.strip(), "musica": nome_musica.strip()}
             )
             session.commit()
