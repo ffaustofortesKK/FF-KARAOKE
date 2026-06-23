@@ -1,40 +1,10 @@
 import streamlit as st
-import json
-from sqlalchemy import text
+import requests
 
-# Inicializa a Conexão com a Base de Dados
-conn = st.connection("pedidos_db", type="sql")
+# Link oficial do teu Firebase
+URL_FIREBASE = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedido.json"
 
-# GARANTE QUE A TABELA EXISTE ANTES DE QUALQUER OUTRA COISA
-try:
-    with conn.session as session:
-        session.execute(text("CREATE TABLE IF NOT EXISTS karaoke_pedidos (id INTEGER PRIMARY KEY AUTOINCREMENT, cantor TEXT, musica TEXT);"))
-        session.commit()
-except Exception as e:
-    pass
-
-# =========================================================================
-# 1. API DE RESPOSTA IMEDIATA AO PORTÁTIL
-# =========================================================================
-query_params = st.query_params
-
-if "obter_pedido" in query_params:
-    try:
-        df = conn.query("SELECT cantor, musica FROM karaoke_pedidos ORDER BY id DESC LIMIT 1;", ttl=0)
-        
-        if df is not None and not df.empty:
-            resposta = {"cantor": str(df['cantor'].iloc[0]), "musica": str(df['musica'].iloc[0])}
-        else:
-            resposta = {"cantor": "", "musica": ""}
-    except Exception as e:
-        resposta = {"cantor": "Erro BD", "musica": str(e)}
-    
-    st.text(json.dumps(resposta, ensure_ascii=False))
-    st.stop()
-
-# =========================================================================
-# 2. DESIGN DA INTERFACE PARA OS CLIENTES (Telemóvel)
-# =========================================================================
+# Configuração da página do Cliente
 st.set_page_config(page_title="FF KARAOKE - Pedir Música", page_icon="🎤", layout="centered")
 
 st.markdown("""
@@ -49,7 +19,7 @@ st.markdown("""
 st.markdown("<h1>🎤 FF KARAOKE CLOUD 🎵</h1>", unsafe_allow_html=True)
 st.write("---")
 
-# Formulário de envio
+# Formulário de envio para o cliente
 with st.form(key="form_pedido", clear_on_submit=True):
     nome_cantor = st.text_input("Seu Nome (Quem vai cantar):", placeholder="Ex: Fausto Fortes")
     nome_musica = st.text_input("Nome da Música ou Artista:", placeholder="Ex: Melodia")
@@ -60,13 +30,17 @@ if botao_enviar:
         st.error("❌ Por favor, preencha o seu nome e o nome da música!")
     else:
         try:
-            with conn.session as session:
-                session.execute(
-                    text("INSERT INTO karaoke_pedidos (cantor, musica) VALUES (:cantor, :musica);"),
-                    {"cantor": nome_cantor.strip(), "musica": nome_musica.strip()}
-                )
-                session.commit()
-            st.success(f"✅ Sucesso, {nome_cantor}! O teu pedido foi enviado.")
-            st.balloons()
+            dados = {
+                "cantor": nome_cantor.strip(),
+                "musica": nome_musica.strip()
+            }
+            # Envia os dados diretamente para o Firebase usando PUT (substitui o último)
+            resposta = requests.put(URL_FIREBASE, json=dados, timeout=5)
+            
+            if resposta.status_code == 200:
+                st.success(f"✅ Sucesso, {nome_cantor}! O teu pedido foi enviado.")
+                st.balloons()
+            else:
+                st.error(f"Erro no servidor externo: Status {resposta.status_code}")
         except Exception as e:
-            st.error(f"Erro ao guardar o pedido: {e}")
+            st.error(f"Erro ao enviar o pedido: {e}")
