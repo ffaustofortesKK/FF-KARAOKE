@@ -2,21 +2,24 @@ import streamlit as st
 import json
 from sqlalchemy import text
 
+# Inicializa a Conexão com a Base de Dados
+conn = st.connection("pedidos_db", type="sql")
+
+# GARANTE QUE A TABELA EXISTE ANTES DE QUALQUER OUTRA COISA
+try:
+    with conn.session as session:
+        session.execute(text("CREATE TABLE IF NOT EXISTS karaoke_pedidos (id INTEGER PRIMARY KEY AUTOINCREMENT, cantor TEXT, musica TEXT);"))
+        session.commit()
+except Exception as e:
+    pass
+
 # =========================================================================
-# 1. API DE RESPOSTA IMEDIATA AO PORTÁTIL (Sem carregar HTML)
+# 1. API DE RESPOSTA IMEDIATA AO PORTÁTIL
 # =========================================================================
 query_params = st.query_params
 
 if "obter_pedido" in query_params:
     try:
-        # Abre a conexão apenas para responder à rota de dados
-        conn = st.connection("pedidos_db", type="sql")
-        
-        # Criar a tabela caso ela ainda não exista na nuvem
-        with conn.session as session:
-            session.execute(text("CREATE TABLE IF NOT EXISTS karaoke_pedidos (id INTEGER PRIMARY KEY AUTOINCREMENT, cantor TEXT, musica TEXT);"))
-            session.commit()
-            
         df = conn.query("SELECT cantor, musica FROM karaoke_pedidos ORDER BY id DESC LIMIT 1;", ttl=0)
         
         if df is not None and not df.empty:
@@ -26,7 +29,6 @@ if "obter_pedido" in query_params:
     except Exception as e:
         resposta = {"cantor": "Erro BD", "musica": str(e)}
     
-    # Exibe APENAS o JSON e para a execução para não enviar HTML
     st.text(json.dumps(resposta, ensure_ascii=False))
     st.stop()
 
@@ -46,9 +48,6 @@ st.markdown("""
 
 st.markdown("<h1>🎤 FF KARAOKE CLOUD 🎵</h1>", unsafe_allow_html=True)
 st.write("---")
-
-# Conexão para o formulário visual
-conn = st.connection("pedidos_db", type="sql")
 
 # Formulário de envio
 with st.form(key="form_pedido", clear_on_submit=True):
