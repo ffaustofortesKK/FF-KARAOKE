@@ -1,5 +1,5 @@
 import streamlit as st
-from sqlalchemy import text
+import requests
 import json
 
 # Configuração da página do Streamlit
@@ -22,30 +22,15 @@ st.markdown("<h1>🎤 FF KARAOKE CLOUD 🎵</h1>", unsafe_allow_html=True)
 st.markdown("<p class='subtitulo'>Escolha a sua música e solte a sua voz!</p>", unsafe_allow_html=True)
 st.write("---")
 
-# Liga à base de dados interna (SQLite integrada no Streamlit)
-conn = st.connection("pedidos_db", type="sql")
+# Inicializa um histórico temporário na memória do Streamlit para evitar falhas de leitura
+if "ultimo_pedido" not in st.session_state:
+    st.session_state["ultimo_pedido"] = {"cantor": "", "musica": ""}
 
-# Garante que a tabela de pedidos existe
-with conn.session as session:
-    session.execute(text("CREATE TABLE IF NOT EXISTS karaoke_pedidos (id INTEGER PRIMARY KEY AUTOINCREMENT, cantor TEXT, musica TEXT);"))
-    session.commit()
-
-# --- INSTALAÇÃO DA API: Verifica se o app.py do PC está a pedir dados ---
+# --- INSTALAÇÃO DA API: Envia os dados para o app.py do computador ---
 query_params = st.query_params
 if "api" in query_params:
-    # Puxa o último pedido feito na base de dados
-    df = conn.query("SELECT cantor, musica FROM karaoke_pedidos ORDER BY id DESC LIMIT 1;", ttl=0)
-    
-    if not df.empty:
-        resposta = {
-            "cantor": str(df['cantor'].iloc[0]), 
-            "musica": str(df['musica'].iloc[0])
-        }
-    else:
-        resposta = {"cantor": "", "musica": ""}
-    
-    # Entrega o resultado como JSON puro e para o Streamlit imediatamente
-    st.text(json.dumps(resposta))
+    # Entrega o último pedido feito em formato JSON limpo para o PC ler
+    st.text(json.dumps(st.session_state["ultimo_pedido"]))
     st.stop()
 
 # --- FORMULÁRIO PARA OS CLIENTES (TELEMÓVEL) ---
@@ -59,20 +44,15 @@ if botao_enviar:
     if nome_cantor.strip() == "" or nome_musica.strip() == "":
         st.error("❌ Por favor, preencha o seu nome e o nome da música!")
     else:
-        try:
-            with conn.session as session:
-                session.execute(
-                    text("INSERT INTO karaoke_pedidos (cantor, musica) VALUES (:cantor, :musica);"),
-                    {"cantor": nome_cantor.strip(),  "musica": nome_musica.strip()}
-                )
-                session.commit()
-            st.success(f"✅ Sucesso, {nome_cantor}! O teu pedido foi enviado para o operador.")
-            st.balloons()  # Solta balões de comemoração no telemóvel
-        except:
-            st.error("❌ Erro temporário ao enviar o pedido. Tente novamente.")
+        # Atualiza o pedido na nuvem
+        st.session_state["ultimo_pedido"] = {
+            "cantor": nome_cantor.strip(),
+            "musica": nome_musica.strip()
+        }
+        st.success(f"✅ Sucesso, {nome_cantor}! O teu pedido foi enviado para o painel do operador.")
+        st.balloons()
 
-# Espaço decorativo/informativo no rodapé do telemóvel
-st.write("---")
-df_visual = conn.query("SELECT cantor, musica FROM karaoke_pedidos ORDER BY id DESC LIMIT 1;", ttl=0)
-if not df_visual.empty:
-    st.caption(f"🎤 Último pedido enviado ao sistema: {df_visual['cantor'].iloc[0]} — {df_visual['musica'].iloc[0]}")
+# Rodapé informativo
+if st.session_state["ultimo_pedido"]["cantor"] != "":
+    st.write("---")
+    st.caption(f"🎤 Último pedido registado: {st.session_state['ultimo_pedido']['cantor']} — {st.session_state['ultimo_pedido']['musica']}")
