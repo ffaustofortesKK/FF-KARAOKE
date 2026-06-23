@@ -3,7 +3,7 @@ import json
 from sqlalchemy import text
 
 # =========================================================================
-# 1. API PARA ENVIAR OS PEDIDOS AO TEU PORTÁTIL (Sem Cache)
+# 1. API DE RESPOSTA AO PORTÁTIL (Sem Cache)
 # =========================================================================
 query_params = st.query_params
 
@@ -23,7 +23,7 @@ if "obter_pedido" in query_params:
     st.stop()
 
 # =========================================================================
-# 2. INTERFACE DO TELEMÓVEL PARA OS CLIENTES PEDIREM MÚSICA
+# 2. DESIGN DA INTERFACE PARA OS CLIENTES (Telemóvel)
 # =========================================================================
 st.set_page_config(page_title="FF KARAOKE - Pedir Música", page_icon="🎤", layout="centered")
 
@@ -39,13 +39,13 @@ st.markdown("""
 st.markdown("<h1>🎤 FF KARAOKE CLOUD 🎵</h1>", unsafe_allow_html=True)
 st.write("---")
 
-# Inicializa a tabela da Base de Dados
+# Inicializa a Base de Dados SQL interna do Streamlit
 conn = st.connection("pedidos_db", type="sql")
 with conn.session as session:
     session.execute(text("CREATE TABLE IF NOT EXISTS karaoke_pedidos (id INTEGER PRIMARY KEY AUTOINCREMENT, cantor TEXT, musica TEXT);"))
     session.commit()
 
-# Formulário para o cliente preencher
+# Formulário de envio
 with st.form(key="form_pedido", clear_on_submit=True):
     nome_cantor = st.text_input("Seu Nome (Quem vai cantar):", placeholder="Ex: Fausto Fortes")
     nome_musica = st.text_input("Nome da Música ou Artista:", placeholder="Ex: Vou Cantar Para Não Chorar")
@@ -65,4 +65,4 @@ if botao_enviar:
             st.success(f"✅ Sucesso, {nome_cantor}! O teu pedido foi enviado.")
             st.balloons()
         except:
-            st.error("Erro ao enviar para a Base de Dados.")
+            st.error("Erro ao guardar o pedido na Base de Dados.")
