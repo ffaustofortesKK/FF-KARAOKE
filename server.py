@@ -1,8 +1,28 @@
 import streamlit as str
-from sqlalchemy import text  # Importação necessária para corrigir o erro
+from sqlalchemy import text  
+import json
 
 # Configuração da página do telemóvel do cliente
 str.set_page_config(page_title="FF KARAOKE - Pedir Música", page_icon="🎤", layout="centered")
+
+# --- VERIFICAÇÃO DE API PARA O PC (SISTEMA INTEGRADO) ---
+# Se o PC chamar o site com ?api=1, o site responde apenas os dados puros em JSON e para por aqui
+query_params = str.query_params
+if "api" in query_params and query_params["api"] == "1":
+    try:
+        conn = str.connection("pedidos_db", type="sql")
+        df = conn.query("SELECT cantor, musica FROM karaoke_pedidos ORDER BY id DESC LIMIT 1;", ttl=0)
+        if not df.empty:
+            resposta = {
+                "cantor": str(df['cantor'].iloc[0]),
+                "musica": str(df['musica'].iloc[0])
+            }
+            str.text(json.dumps(resposta, ensure_ascii=False))
+        else:
+            str.text(json.dumps({}))
+    except Exception as e:
+        str.text(json.dumps({"erro": str(e)}))
+    str.stop()  # Interrompe o resto da página para enviar só o dado puro ao PC
 
 # Estilo visual personalizado (Cores do FF Karaoke)
 str.markdown("""
@@ -19,7 +39,7 @@ str.write("---")
 # Liga à base de dados interna do Streamlit
 conn = str.connection("pedidos_db", type="sql")
 
-# Cria a tabela se não existir (usando text() para evitar o erro de ArgumentError)
+# Cria a tabela se não existir
 with conn.session as session:
     session.execute(text("CREATE TABLE IF NOT EXISTS karaoke_pedidos (id INTEGER PRIMARY KEY AUTOINCREMENT, cantor TEXT, musica TEXT);"))
     session.commit()
@@ -42,7 +62,7 @@ if botao_enviar:
         str.success(f"✅ Sucesso, {nome_cantor}! O teu pedido foi enviado.")
         str.balloons()
 
-# Mostra o último pedido de forma simples na página para o computador ler
+# Mostra o último pedido na página de forma visual
 df = conn.query("SELECT cantor, musica FROM karaoke_pedidos ORDER BY id DESC LIMIT 1;", ttl=0)
 if not df.empty:
-    str.write(f"ÚLTIMO_PEDIDO: {df['cantor'].iloc[0]} || {df['musica'].iloc[0]}")
+    str.info(f"🎤 Último pedido enviado: **{df['cantor'].iloc[0]}** — 🎵 **{df['musica'].iloc[0]}**")
