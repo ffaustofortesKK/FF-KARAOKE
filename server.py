@@ -2,6 +2,10 @@ import streamlit as st
 import json
 from sqlalchemy import text
 
+# Configuração da URL da Base de Dados SQLite local direta (Evita o erro de Secrets)
+# Isto cria um ficheiro chamado 'karaoke.db' na nuvem automaticamente.
+st.config.set_option("connections.pedidos_db.url", "sqlite:///karaoke.db")
+
 # =========================================================================
 # 1. API DE RESPOSTA AO PORTÁTIL (Sem Cache)
 # =========================================================================
@@ -64,5 +68,5 @@ if botao_enviar:
                 session.commit()
             st.success(f"✅ Sucesso, {nome_cantor}! O teu pedido foi enviado.")
             st.balloons()
-        except:
-            st.error("Erro ao guardar o pedido na Base de Dados.")
+        except Exception as e:
+            st.error(f"Erro ao guardar o pedido: {e}")
