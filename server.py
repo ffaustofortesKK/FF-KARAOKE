@@ -1,9 +1,12 @@
 import streamlit as st
-import requests
 import json
+import os
 
 # Configuração da página do Streamlit
 st.set_page_config(page_title="FF KARAOKE - Pedir Música", page_icon="🎤", layout="centered")
+
+# Nome do ficheiro partilhado na nuvem para romper o isolamento de sessão
+FICHEIRO_NUVEM = "ultimo_pedido_stream.txt"
 
 # Estilo visual personalizado (Tema Escuro e Dourado)
 st.markdown("""
@@ -22,15 +25,18 @@ st.markdown("<h1>🎤 FF KARAOKE CLOUD 🎵</h1>", unsafe_allow_html=True)
 st.markdown("<p class='subtitulo'>Escolha a sua música e solte a sua voz!</p>", unsafe_allow_html=True)
 st.write("---")
 
-# Inicializa um histórico temporário na memória do Streamlit para evitar falhas de leitura
-if "ultimo_pedido" not in st.session_state:
-    st.session_state["ultimo_pedido"] = {"cantor": "", "musica": ""}
-
-# --- INSTALAÇÃO DA API: Envia os dados para o app.py do computador ---
+# --- INTERCEÇÃO DA API (O que o computador lê) ---
 query_params = st.query_params
 if "api" in query_params:
-    # Entrega o último pedido feito em formato JSON limpo para o PC ler
-    st.text(json.dumps(st.session_state["ultimo_pedido"]))
+    if os.path.exists(FICHEIRO_NUVEM):
+        with open(FICHEIRO_NUVEM, "r", encoding="utf-8") as f:
+            conteudo = f.read().strip()
+            if conteudo:
+                st.text(conteudo)
+                st.stop()
+    
+    # Se o ficheiro não existir ou estiver vazio, devolve estrutura vazia
+    st.text(json.dumps({"cantor": "", "musica": ""}))
     st.stop()
 
 # --- FORMULÁRIO PARA OS CLIENTES (TELEMÓVEL) ---
@@ -44,15 +50,23 @@ if botao_enviar:
     if nome_cantor.strip() == "" or nome_musica.strip() == "":
         st.error("❌ Por favor, preencha o seu nome e o nome da música!")
     else:
-        # Atualiza o pedido na nuvem
-        st.session_state["ultimo_pedido"] = {
+        dados_pedido = {
             "cantor": nome_cantor.strip(),
             "musica": nome_musica.strip()
         }
+        # Grava no ficheiro partilhado que ignora o bloqueio de utilizadores do Streamlit
+        with open(FICHEIRO_NUVEM, "w", encoding="utf-8") as f:
+            f.write(json.dumps(dados_pedido))
+            
         st.success(f"✅ Sucesso, {nome_cantor}! O teu pedido foi enviado para o painel do operador.")
         st.balloons()
 
-# Rodapé informativo
-if st.session_state["ultimo_pedido"]["cantor"] != "":
-    st.write("---")
-    st.caption(f"🎤 Último pedido registado: {st.session_state['ultimo_pedido']['cantor']} — {st.session_state['ultimo_pedido']['musica']}")
+# Mostrar na tela do telemóvel para confirmação visual
+if os.path.exists(FICHEIRO_NUVEM):
+    try:
+        with open(FICHEIRO_NUVEM, "r", encoding="utf-8") as f:
+            print_dados = json.loads(f.read())
+            if print_dados.get("cantor"):
+                st.write("---")
+                st.caption(f"🎤 Último pedido registado no sistema: {print_dados['cantor']} — {print_dados['musica']}")
+    except: pass
