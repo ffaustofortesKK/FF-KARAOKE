@@ -2,27 +2,31 @@ import streamlit as st
 import json
 from sqlalchemy import text
 
-# Configuração da URL da Base de Dados SQLite local direta (Evita o erro de Secrets)
-# Isto cria um ficheiro chamado 'karaoke.db' na nuvem automaticamente.
-st.config.set_option("connections.pedidos_db.url", "sqlite:///karaoke.db")
-
 # =========================================================================
-# 1. API DE RESPOSTA AO PORTÁTIL (Sem Cache)
+# 1. API DE RESPOSTA IMEDIATA AO PORTÁTIL (Sem carregar HTML)
 # =========================================================================
 query_params = st.query_params
 
 if "obter_pedido" in query_params:
     try:
+        # Abre a conexão apenas para responder à rota de dados
         conn = st.connection("pedidos_db", type="sql")
+        
+        # Criar a tabela caso ela ainda não exista na nuvem
+        with conn.session as session:
+            session.execute(text("CREATE TABLE IF NOT EXISTS karaoke_pedidos (id INTEGER PRIMARY KEY AUTOINCREMENT, cantor TEXT, musica TEXT);"))
+            session.commit()
+            
         df = conn.query("SELECT cantor, musica FROM karaoke_pedidos ORDER BY id DESC LIMIT 1;", ttl=0)
         
-        if not df.empty:
+        if df is not None and not df.empty:
             resposta = {"cantor": str(df['cantor'].iloc[0]), "musica": str(df['musica'].iloc[0])}
         else:
             resposta = {"cantor": "", "musica": ""}
     except Exception as e:
         resposta = {"cantor": "Erro BD", "musica": str(e)}
     
+    # Exibe APENAS o JSON e para a execução para não enviar HTML
     st.text(json.dumps(resposta, ensure_ascii=False))
     st.stop()
 
@@ -43,16 +47,13 @@ st.markdown("""
 st.markdown("<h1>🎤 FF KARAOKE CLOUD 🎵</h1>", unsafe_allow_html=True)
 st.write("---")
 
-# Inicializa a Base de Dados SQL interna do Streamlit
+# Conexão para o formulário visual
 conn = st.connection("pedidos_db", type="sql")
-with conn.session as session:
-    session.execute(text("CREATE TABLE IF NOT EXISTS karaoke_pedidos (id INTEGER PRIMARY KEY AUTOINCREMENT, cantor TEXT, musica TEXT);"))
-    session.commit()
 
 # Formulário de envio
 with st.form(key="form_pedido", clear_on_submit=True):
     nome_cantor = st.text_input("Seu Nome (Quem vai cantar):", placeholder="Ex: Fausto Fortes")
-    nome_musica = st.text_input("Nome da Música ou Artista:", placeholder="Ex: Vou Cantar Para Não Chorar")
+    nome_musica = st.text_input("Nome da Música ou Artista:", placeholder="Ex: Melodia")
     botao_enviar = st.form_submit_button(label="🚀 ENVIAR PEDIDO DE MÚSICA")
 
 if botao_enviar:
