@@ -6,27 +6,38 @@ import time
 # Configuração da página
 st.set_page_config(page_title="FF KARAOKE CLOUD", layout="wide")
 
-# Carregar o CSS externo
-def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+# --- CSS INTEGRADO (Não precisas de ficheiro externo se colares isto aqui) ---
+st.markdown("""
+    <style>
+    .stApp { background-color: #000000; color: #D4AF37; }
+    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {
+        background-color: #1a1a1a !important; border: 2px solid #D4AF37 !important;
+        color: #D4AF37 !important; border-radius: 8px !important;
+    }
+    div.stButton > button {
+        background-color: #D4AF37 !important; color: #000 !important;
+        font-weight: bold !important; border-radius: 8px !important; width: 100%;
+    }
+    h1, h2, h3 { color: #D4AF37 !important; text-align: center; }
+    </style>
+""", unsafe_allow_html=True)
 
-local_css("style.css")
-
-# --- LÓGICA DO APP ---
+# --- CABEÇALHO ---
 st.title("GRUPO FF KARAOKE")
 st.markdown("<h4 style='text-align: center; color: #D4AF37;'>INSTAGRAM: ff_karaoke | TIK TOK: ff.karaoke</h4>", unsafe_allow_html=True)
 st.write("---")
 
+# --- LÓGICA ---
 col1, col2 = st.columns([2, 1])
 
 # Carregar catálogo
 URL_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
+URL_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
+
 try:
     resp = requests.get(URL_CATALOGO, timeout=5)
     catalogo = resp.json() if resp.status_code == 200 else {}
 except: catalogo = {}
-
 opcoes = list(catalogo.keys()) if isinstance(catalogo, dict) else []
 
 with col1:
@@ -35,16 +46,30 @@ with col1:
     
     if st.button("enviar"):
         if nome and musica != "-- Selecione --":
-            # Aqui vai o código de envio para o Firebase
-            st.success("Pedido enviado com sucesso!")
+            pedido = {"cantor": nome, "musica": musica, "timestamp": time.time()}
+            envio = requests.post(URL_PEDIDOS, json=pedido)
+            if envio.status_code == 200:
+                st.success("Pedido enviado com sucesso!")
+            else:
+                st.error("Erro ao enviar.")
         else:
-            st.error("Por favor, preencha o nome e escolha a música.")
+            st.error("Preencha o nome e escolha a música.")
 
 with col2:
     st.subheader("tirar Foto")
     foto = st.camera_input("")
-    if foto:
-        st.write("Foto capturada!")
+    if foto: st.write("Foto capturada!")
 
+# --- FILA DE ESPERA ---
 st.write("---")
 st.subheader("📺 Fila de Espera")
+try:
+    pedidos_resp = requests.get(URL_PEDIDOS, timeout=5)
+    pedidos = pedidos_resp.json() if pedidos_resp.status_code == 200 else {}
+    if pedidos:
+        for i, (id_pedido, info) in enumerate(pedidos.items(), 1):
+            st.write(f"**{i}.** {info.get('cantor')} - *{info.get('musica')}*")
+    else:
+        st.info("A fila está vazia.")
+except:
+    st.warning("Não foi possível carregar a fila.")
