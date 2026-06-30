@@ -3,78 +3,64 @@ import requests
 import json
 import time
 
-# --- CONFIGURAÇÕES ---
+# Configurações do Firebase
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedido.json"
 URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
 
-st.set_page_config(page_title="FF KARAOKE", layout="wide")
+st.set_page_config(page_title="FF Karaoke Cloud", layout="wide")
 
-# --- CSS PARA O DESIGN DOURADO (O "LOOK & FEEL" DA IMAGEM) ---
-st.markdown("""
-    <style>
-    .stApp { background-color: #0d0d0d; color: #D4AF37; }
-    h1 { color: #D4AF37; text-align: center; font-family: 'Arial Black'; }
-    div.stButton > button { 
-        background-color: #D4AF37; color: #000; font-weight: bold; 
-        border-radius: 10px; width: 100%; height: 50px; border: none;
-    }
-    div[data-baseweb="input"], div[data-baseweb="select"] { 
-        background-color: #1a1a1a !important; border: 1px solid #D4AF37 !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# --- SESSÃO PARA MANTER DADOS ---
+# --- INICIALIZAÇÃO DE SESSÃO ---
 if 'nome_cliente' not in st.session_state: st.session_state.nome_cliente = ""
 if 'foto_cliente' not in st.session_state: st.session_state.foto_cliente = None
 
-st.title("GRUPO FF KARAOKE")
+st.title("🎤 FF KARAOKE CLOUD")
 
-# --- LAYOUT (Colunas iguais à imagem) ---
-col1, col2 = st.columns([1, 1])
-
-# Lógica do Catálogo
-try:
-    resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
-    catalogo = resp.json() if resp.status_code == 200 else {}
-except: catalogo = {}
-
-opcoes = list(catalogo.keys()) if isinstance(catalogo, dict) else []
-
-with col1:
-    # Nome
-    nome_input = st.text_input("Nome", value=st.session_state.nome_cliente, placeholder="Escreva o seu nome...")
-    st.session_state.nome_cliente = nome_input
+# --- LOGIN / PERFIL DO CANTOR ---
+with st.sidebar:
+    st.header("👤 Perfil do Cantor")
+    nome_input = st.text_input("Teu Nome:", value=st.session_state.nome_cliente)
+    foto_file = st.file_uploader("Escolher Foto:", type=['jpg', 'png'])
     
-    # Música
-    musica = st.selectbox("Localizar musica", ["-- Selecione --"] + opcoes)
+    if st.button("Guardar Perfil"):
+        st.session_state.nome_cliente = nome_input
+        if foto_file: st.session_state.foto_cliente = foto_file.getvalue()
+        st.success("Perfil Guardado!")
+
+# --- ÁREA DO PEDIDO ---
+if st.session_state.nome_cliente:
+    st.write(f"### Bem-vindo, {st.session_state.nome_cliente}!")
+    if st.session_state.foto_cliente:
+        st.image(st.session_state.foto_cliente, width=100)
     
-    # Botão Enviar
-    if st.button("ENVIAR PEDIDO"):
-        if st.session_state.nome_cliente and musica != "-- Selecione --":
+    catalogo = requests.get(URL_FIREBASE_CATALOGO).json() or {}
+    
+    with st.form("form_pedido", clear_on_submit=True):
+        musica = st.selectbox("Escolha a música:", ["-- Selecione --"] + list(catalogo.keys()))
+        btn = st.form_submit_button("🚀 Enviar Pedido")
+        
+        if btn and musica != "-- Selecione --":
             pedido = {
                 "cantor": st.session_state.nome_cliente,
                 "musica": musica,
-                "arquivo_real": catalogo.get(musica, musica),
+                "arquivo_real": catalogo[musica],
                 "timestamp": time.time()
             }
             requests.post(URL_FIREBASE_PEDIDOS, json=pedido)
-            st.success("Pedido enviado com sucesso!")
-        else:
-            st.error("Preencha o nome e escolha a música.")
+            st.success(f"Pedido de '{musica}' enviado!")
 
-with col2:
-    st.write("### Carregar Foto")
-    foto_camera = st.camera_input("")
-    if foto_camera:
-        st.session_state.foto_cliente = foto_camera.getvalue()
-
-# --- ÁREA DO DJ (Segunda Tela) ---
+# --- SEGUNDA TELA (Simulação de Anúncio) ---
 st.markdown("---")
-st.subheader("📺 Fila de Espera (Visão do DJ)")
+st.header("📺 Ecrã do DJ (Próximo Cantor)")
+
+# Aqui vamos buscar os pedidos para numerá-los
 pedidos_raw = requests.get(URL_FIREBASE_PEDIDOS).json() or {}
 if pedidos_raw:
-    for i, p in enumerate(pedidos_raw.values(), 1):
-        st.write(f"**#{i}** - **Cantor:** {p['cantor']} | **Música:** {p['musica']}")
+    lista_pedidos = list(pedidos_raw.values())
+    for i, p in enumerate(lista_pedidos, 1):
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.metric("Pedido", f"#{i}")
+        with col2:
+            st.write(f"**Cantor:** {p['cantor']} | **Música:** {p['musica']}")
 else:
     st.info("Nenhum pedido na fila.")
