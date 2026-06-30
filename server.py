@@ -8,11 +8,13 @@ URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/cata
 
 st.set_page_config(page_title="FF KARAOKE CLOUD", layout="wide")
 
-# --- CSS E LÓGICA DE ESTADO ---
+# --- CSS PERSONALIZADO ---
 st.markdown("""
     <style>
-    .logo-container { display: flex; justify-content: center; }
-    .logo-container img { width: 30% !important; }
+    /* Logótipo Completo e sem cortes */
+    .logo-container { width: 100%; display: flex; justify-content: center; }
+    .logo-container img { width: 100% !important; max-width: 400px; height: auto !important; }
+    
     .stApp { background-color: #000000; color: #D4AF37; }
     label { color: white !important; font-weight: bold; }
     div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {
@@ -44,39 +46,39 @@ if not st.session_state.registado:
         else:
             st.error("Preencha o nome e confirme as redes sociais!")
 else:
-    # --- FASE 2: DASHBOARD ---
     st.success(f"Bem-vindo, {st.session_state.nome}!")
     
+    # --- FASE 2: DASHBOARD ---
     col1, col2 = st.columns([2, 1])
     with col1:
         st.subheader("🎶 Pedido de Música")
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            busca = st.text_input("Título / Cantor:")
-        with c2:
-            st.write("###") 
-            if st.button("Pesquisar"):
-                # Carregar catálogo e filtrar
-                try:
-                    resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
-                    cat = list(resp.json().keys()) if resp.status_code == 200 else []
-                    st.session_state.resultados_busca = [m for m in cat if busca.lower() in m.lower()]
-                except:
-                    st.session_state.resultados_busca = []
+        busca = st.text_input("Título / Cantor:")
+        
+        # Botão Pesquisar que força o recarregamento
+        if st.button("Pesquisar na Nuvem"):
+            try:
+                resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
+                # Verifica se o Firebase retorna um dicionário ou lista
+                dados = resp.json()
+                cat = list(dados.keys()) if isinstance(dados, dict) else dados
+                st.session_state.resultados_busca = [m for m in cat if busca.lower() in m.lower()]
+                st.rerun() # OBRIGATÓRIO: força o app a mostrar o que encontrou
+            except Exception as e:
+                st.error(f"Erro ao ligar à nuvem: {e}")
 
-        # Mostrar resultados se existirem na memória da sessão
+        # Se encontrou algo, mostra a lista
         if st.session_state.resultados_busca:
             escolha = st.selectbox("Selecione a música:", st.session_state.resultados_busca)
-            if st.button("Confirmar Pedido da Nuvem"):
+            if st.button("Confirmar Pedido"):
                 requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
                 st.success(f"Pedido de {escolha} enviado!")
-                st.session_state.resultados_busca = None # Limpa após enviar
+                st.session_state.resultados_busca = None
         elif st.session_state.resultados_busca == []:
             st.warning("Nenhuma música encontrada.")
 
         st.write("---")
         st.subheader("📝 Pedido Manual")
-        manual = st.text_input("Escreva manualmente se não encontrou:")
+        manual = st.text_input("Não encontrou? Escreva manualmente:")
         if st.button("Enviar Pedido Manual"):
             if manual:
                 requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": manual})
@@ -86,4 +88,5 @@ else:
         st.camera_input("Foto")
         if st.button("Sair / Limpar"):
             st.session_state.registado = False
+            st.session_state.resultados_busca = None
             st.rerun()
