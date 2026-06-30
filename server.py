@@ -8,86 +8,83 @@ URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/cata
 
 st.set_page_config(page_title="FF KARAOKE CLOUD", layout="wide")
 
-# --- LÓGICA DE ESTADO (Nome e Tema) ---
-if 'nome_cantor' not in st.session_state:
-    st.session_state.nome_cantor = ""
-if 'tema' not in st.session_state:
-    st.session_state.tema = "Preto"
+# --- LÓGICA DE SESSÃO (Estado) ---
+if 'registado' not in st.session_state: st.session_state.registado = False
+if 'nome' not in st.session_state: st.session_state.nome = ""
 
-# --- CSS DINÂMICO ---
-cor_bg = "#000000" if st.session_state.tema == "Preto" else "#FFFFFF"
-cor_texto = "#D4AF37" if st.session_state.tema == "Preto" else "#000000"
-
-st.markdown(f"""
+# --- CSS (Redução do Logo e Estilo) ---
+st.markdown("""
     <style>
-    .stApp {{ background-color: {cor_bg}; color: {cor_texto}; }}
-    h1, h2, h3 {{ color: {cor_texto} !important; text-align: center; }}
-    label, .stTextInput > div > div > input {{ 
-        color: {cor_texto} !important; 
-        font-weight: bold !important; 
-        text-shadow: 1px 1px 2px #888;
-    }}
-    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {{
-        background-color: #222 !important; 
-        border: 2px solid {cor_texto} !important;
-        border-radius: 8px !important;
-    }}
-    div.stButton > button {{
-        background-color: {cor_texto} !important;
-        color: {cor_bg} !important;
-        font-weight: bold !important;
-        width: 100%;
-    }}
+    .logo-container { display: flex; justify-content: center; }
+    .logo-container img { width: 30% !important; } /* Redução para 30% (aprox. 70% menor) */
+    .stApp { background-color: #000000; color: #D4AF37; }
+    label { color: white !important; font-weight: bold; }
+    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {
+        background-color: #1a1a1a !important; border: 2px solid #D4AF37 !important;
+        color: #D4AF37 !important; border-radius: 8px !important;
+    }
+    div.stButton > button { background-color: #D4AF37 !important; color: #000 !important; font-weight: bold; width: 100%; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- CABEÇALHO ---
-st.image("https://i.ibb.co/HfKTnDDQ/logoweb.png", use_container_width=True)
-st.markdown(f"<h4 style='text-align: center; color: {cor_texto};'>INSTAGRAM: ff_karaoke | TIK TOK: ff.karaoke</h4>", unsafe_allow_html=True)
+# --- CABEÇALHO COM LOGO REDUZIDO ---
+st.markdown('<div class="logo-container"><img src="https://i.ibb.co/HfKTnDDQ/logoweb.png"></div>', unsafe_allow_html=True)
+st.markdown("<h4 style='text-align: center; color: #D4AF37;'>INSTAGRAM: ff_karaoke | TIK TOK: ff.karaoke</h4>", unsafe_allow_html=True)
 
-# --- OPÇÕES DE TEMA ---
-st.session_state.tema = st.radio("Escolha o Tema:", ["Preto", "Branco"], horizontal=True)
-
-# --- LÓGICA DE REGISTO DE NOME ---
-if not st.session_state.nome_cantor:
-    nome_input = st.text_input("Digite o seu nome para começar:")
-    if st.button("Guardar Nome"):
-        st.session_state.nome_cantor = nome_input
-        st.rerun()
+# --- FASE 1: REGISTO (Só aparece se não estiver registado) ---
+if not st.session_state.registado:
+    st.subheader("📝 Registo Inicial")
+    with st.form("registo"):
+        nome = st.text_input("Nome:")
+        pref = st.radio("Preferência musical:", ["Internacional", "Nacional"])
+        agenda = st.radio("Quer acompanhar agenda de Karaoke do Grupo FF?", ["Sim", "Não"])
+        if st.form_submit_button("Concluir Registo"):
+            if nome:
+                st.session_state.nome = nome
+                st.session_state.registado = True
+                st.rerun()
+            else: st.error("Insira o seu nome!")
 else:
-    st.success(f"Olá, {st.session_state.nome_cantor}!")
-    if st.button("Trocar Nome / Limpar"):
-        st.session_state.nome_cantor = ""
+    # --- FASE 2: DASHBOARD (Já está registado) ---
+    st.success(f"Bem-vindo, {st.session_state.nome}!")
+    if st.button("Limpar Registo"):
+        st.session_state.registado = False
         st.rerun()
 
-    # --- LÓGICA DE PESQUISA (Apenas se o nome estiver definido) ---
-    @st.cache_data(ttl=300)
-    def carregar_catalogo():
-        try:
-            resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
-            return list(resp.json().keys()) if resp.status_code == 200 else []
-        except: return []
-
-    catalogo = carregar_catalogo()
-    
     col1, col2 = st.columns([2, 1])
+    
     with col1:
-        busca = st.text_input("PESQUISAR MÚSICA:")
-        musica_final = ""
-        if busca:
-            res = [m for m in catalogo if busca.lower() in m.lower()]
-            if res:
-                musica_final = st.selectbox("Selecione:", res)
-            else:
-                musica_final = st.text_input("Pedido Manual:", value=busca)
+        st.subheader("🔍 Pesquisa de Música")
+        busca = st.text_input("Digite o título ou cantor:")
         
-        if st.button("ENVIAR PEDIDO"):
-            if musica_final:
-                dados = {"cantor": st.session_state.nome_cantor, "musica": musica_final}
+        # Carregar catálogo
+        @st.cache_data(ttl=300)
+        def carregar():
+            try:
+                resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
+                return list(resp.json().keys()) if resp.status_code == 200 else []
+            except: return []
+        
+        catalogo = carregar()
+        
+        if busca:
+            resultados = [m for m in catalogo if busca.lower() in m.lower()]
+            if resultados:
+                escolha = st.selectbox("Músicas encontradas:", resultados)
+                if st.button("Enviar Música Encontrada"):
+                    dados = {"cantor": st.session_state.nome, "musica": escolha}
+                    requests.post(URL_FIREBASE_PEDIDOS, json=dados)
+                    st.success("Pedido enviado!")
+        
+        st.write("---")
+        st.subheader("📝 Pedido ao Grupo FF")
+        manual = st.text_input("Título / Cantor (Pedido Manual):")
+        if st.button("Enviar Pedido Manual"):
+            if manual:
+                dados = {"cantor": st.session_state.nome, "musica": manual}
                 requests.post(URL_FIREBASE_PEDIDOS, json=dados)
-                st.balloons()
-                st.success("Enviado!")
+                st.warning("O seu pedido foi enviado, mas nem todas as musicas estão disponíveis em Karaoke.")
 
     with col2:
-        st.subheader("Foto")
-        foto = st.camera_input("")
+        st.subheader("📸 Foto")
+        st.camera_input("")
