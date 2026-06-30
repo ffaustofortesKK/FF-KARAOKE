@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import json
+import os
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
@@ -13,11 +14,8 @@ st.markdown("""
     <style>
     .stApp { background-color: #000000; color: #D4AF37; }
     h1, h2, h3 { color: #D4AF37 !important; text-align: center; }
-    
-    /* Rótulos (Labels) em Branco */
     label { color: white !important; font-weight: bold; }
     
-    /* Inputs personalizados */
     div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {
         background-color: #1a1a1a !important; 
         border: 2px solid #D4AF37 !important;
@@ -25,7 +23,6 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
-    /* Botão Enviar */
     div.stButton > button {
         background-color: #D4AF37 !important;
         color: #000 !important;
@@ -38,7 +35,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CABEÇALHO ---
-st.image("logoweb.png", use_container_width=True) # Logo
+# Verificação de segurança para a imagem
+if os.path.exists("logoweb.png"):
+    st.image("logoweb.png", use_container_width=True)
+else:
+    st.title("🎤 GRUPO FF KARAOKE")
+
 st.markdown("<h4 style='text-align: center; color: #D4AF37;'>INSTAGRAM: ff_karaoke | TIK TOK: ff.karaoke</h4>", unsafe_allow_html=True)
 st.markdown("<h5 style='text-align: center; color: #D4AF37;'>REALIZA A SUA FESTA DE KARAOKE <br> LIGUE : 921204050 / 955099159</h5>", unsafe_allow_html=True)
 
@@ -53,7 +55,7 @@ def carregar_catalogo():
 
 catalogo_musicas = carregar_catalogo()
 
-# --- LAYOUT ---
+# --- LAYOUT EM COLUNAS ---
 col_esq, col_dir = st.columns([2, 1])
 
 with col_esq:
@@ -66,7 +68,7 @@ with col_esq:
         if resultados:
             musica_final = st.selectbox("Selecione a música:", resultados)
         else:
-            st.warning("Música não encontrada no catálogo automático.")
+            st.warning("Música não encontrada no catálogo.")
             musica_final = st.text_input("Confirmar Pedido Manual:", value=busca_musica)
     
     btn_enviar = st.button("ENVIAR PEDIDO")
@@ -75,7 +77,7 @@ with col_dir:
     st.subheader("Tirar Foto")
     foto_selfie = st.camera_input("")
 
-# --- ENVIO ---
+# --- PROCESSAMENTO DO ENVIO ---
 if btn_enviar:
     if not cantor or not musica_final:
         st.error("Por favor, preencha o seu nome e selecione a música.")
@@ -84,5 +86,6 @@ if btn_enviar:
         try:
             requests.post(URL_FIREBASE_PEDIDOS, data=json.dumps(dados), timeout=5)
             st.success(f"🎉 Pedido de {musica_final} enviado!")
+            st.balloons()
         except Exception as e:
             st.error(f"Erro ao enviar: {e}")
