@@ -19,7 +19,7 @@ def carregar_catalogo_real():
     nome_arquivo = "musicas.txt"
     if os.path.exists(nome_arquivo):
         with open(nome_arquivo, "r", encoding="utf-8") as f:
-            return [linha.strip() for linha in f.readlines() if linha.strip()]
+            return [linha.strip() for line in f.readlines() if line.strip()]
     else:
         # Lista de teste caso o musicas.txt não esteja na pasta ainda
         return [
@@ -80,10 +80,11 @@ if btn_enviar:
         }
         
         try:
+            # Correção do nome da variável aqui (de resposta para resposta)
             resposta = requests.post(URL_FIREBASE, data=json.dumps(dados), timeout=5)
-            if respuesta.status_code == 200:
+            if resposta.status_code == 200:
                 st.success(f"🎉 Perfeito! Pedido de **{dados['musica']}** enviado com sucesso para a fila!")
-                st.balloons() # Animação de sucesso no ecrã
+                st.balloons() # Animação de balões no ecrã
             else:
                 st.error("❌ Erro ao processar o pedido. Tente novamente.")
         except Exception as e:
