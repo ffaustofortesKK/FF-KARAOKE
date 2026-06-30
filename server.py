@@ -14,24 +14,22 @@ st.write("Preencha os campos na ordem abaixo para enviar o seu pedido:")
 st.write("---")
 
 # --- FUNÇÃO PARA CARREGAR AS MÚSICAS DO SEU MEGA ---
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=60) # Atualiza a lista a cada 1 minuto se o arquivo mudar
 def carregar_catalogo_real():
     nome_arquivo = "musicas.txt"
     if os.path.exists(nome_arquivo):
         with open(nome_arquivo, "r", encoding="utf-8") as f:
-            return [linha.strip() for line in f.readlines() if line.strip()]
+            return [linha.strip() for linha in f.readlines() if linha.strip()]
     else:
-        # Lista de teste caso o musicas.txt não esteja na pasta ainda
-        return [
-            "Paulo Flores - Garina",
-            "Paulo Flores - Poema do Semba",
-            "Paulo Flores & Yuri da Cunha - Njila Ya Dikanga",
-            "Fausto Fortes - Vou Cantar Para Não Chorar",
-            "Bonga - Olhos Molhados"
-        ]
+        # Se o musicas.txt não for encontrado no servidor, avisa o administrador
+        return []
 
 # Inicializa o catálogo do MEGA
 catalogo_musicas = carregar_catalogo_real()
+
+# Alerta caso o arquivo musicas.txt não tenha sido enviado para o servidor ainda
+if not catalogo_musicas:
+    st.info("ℹ️ Modo de digitação livre ativo. (Crie o arquivo 'musicas.txt' no servidor para ativar o catálogo automático).")
 
 # =========================================================
 # OPERAÇÃO EM PASSO A PASSO (FLUXO EM ABA ÚNICA)
@@ -41,22 +39,25 @@ catalogo_musicas = carregar_catalogo_real()
 cantor = st.text_input("1º Nome do Cantor (Seu Nome):", placeholder="Ex: Fausto Fortes")
 
 # 2º Pesquisar Música
-busca_musica = st.text_input("2º Pesquisar Música (Digite o nome da música ou artista):", placeholder="Ex: Paulo Flores").strip()
+busca_musica = st.text_input("2º Pesquisar Música (Digite o nome da música, cantor ou link do MEGA):", placeholder="Ex: Paulo Flores ou cole o link").strip()
 
 # Variável para guardar o que vai para o DJ
 musica_final = ""
 
 if busca_musica:
-    # Filtra o catálogo do MEGA procurando o que o utilizador digitou
-    resultados = [m for m in catalogo_musicas if busca_musica.lower() in m.lower()]
-    
-    if resultados:
-        st.markdown("⬇️ **Músicas encontradas na sua nuvem MEGA. Selecione a desejada:**")
-        # Cria a lista de escolha com as opções encontradas
-        musica_final = st.selectbox("Escolha a versão exata:", resultados, key="selecao_resultado")
+    if catalogo_musicas:
+        # Filtra procurando o termo ou link digitado
+        resultados = [m for m in catalogo_musicas if busca_musica.lower() in m.lower()]
+        
+        if resultados:
+            st.markdown("⬇️ **Músicas encontradas na sua nuvem MEGA. Selecione a desejada:**")
+            musica_final = st.selectbox("Escolha a versão exata:", resultados, key="selecao_resultado")
+        else:
+            st.warning("⚠️ Esta música não consta na lista pré-carregada do MEGA.")
+            st.info("Pode enviar o pedido assim mesmo. O sistema aceitará o que digitou.")
+            musica_final = busca_musica
     else:
-        st.error("❌ Nenhuma música encontrada com esse nome no acervo do MEGA.")
-        st.info("Nota: Pode avançar e enviar o pedido assim mesmo se o DJ tiver o ficheiro local.")
+        # Se não há catálogo enviado, aceita diretamente o que foi digitao (ex: o link)
         musica_final = busca_musica
 else:
     musica_final = ""
@@ -71,20 +72,18 @@ if btn_enviar:
     if not cantor:
         st.error("⚠️ Por favor, digite o seu nome no **1º campo** antes de enviar.")
     elif not busca_musica:
-        st.error("⚠️ Por favor, pesquise e selecione uma música no **2º campo**.")
+        st.error("⚠️ Por favor, preencha o **2º campo** com a música ou link.")
     else:
-        # Envia os dados limpos para o Firebase
         dados = {
             "cantor": cantor.strip(),
             "musica": musica_final.strip() if musica_final else busca_musica.strip()
         }
         
         try:
-            # Correção do nome da variável aqui (de resposta para resposta)
             resposta = requests.post(URL_FIREBASE, data=json.dumps(dados), timeout=5)
             if resposta.status_code == 200:
-                st.success(f"🎉 Perfeito! Pedido de **{dados['musica']}** enviado com sucesso para a fila!")
-                st.balloons() # Animação de balões no ecrã
+                st.success(f"🎉 Perfeito! Pedido enviado com sucesso para a fila!")
+                st.balloons()
             else:
                 st.error("❌ Erro ao processar o pedido. Tente novamente.")
         except Exception as e:
