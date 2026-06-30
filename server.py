@@ -10,73 +10,81 @@ URL_FIREBASE = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
 st.set_page_config(page_title="FF Karaoke Cloud", page_icon="🎤", layout="centered")
 
 st.title("🎤 FF KARAOKE CLOUD")
-st.write("Preencha os dados abaixo para enviar o seu pedido diretamente ao DJ!")
+st.write("Preencha os campos na ordem abaixo para enviar o seu pedido:")
+st.write("---")
 
 # --- FUNÇÃO PARA CARREGAR AS MÚSICAS DO SEU MEGA ---
-@st.cache_data(ttl=3600)  # Guarda a lista na memória por 1 hora para o site voar!
+@st.cache_data(ttl=3600)
 def carregar_catalogo_real():
     nome_arquivo = "musicas.txt"
-    # Se o arquivo com a lista do MEGA existir, ele lê. Se não, usa uma lista padrão.
     if os.path.exists(nome_arquivo):
         with open(nome_arquivo, "r", encoding="utf-8") as f:
             return [linha.strip() for linha in f.readlines() if linha.strip()]
     else:
-        # Fallback caso você ainda não tenha criado o musicas.txt
+        # Lista de teste caso o musicas.txt não esteja na pasta ainda
         return [
+            "Paulo Flores - Garina",
+            "Paulo Flores - Poema do Semba",
+            "Paulo Flores & Yuri da Cunha - Njila Ya Dikanga",
             "Fausto Fortes - Vou Cantar Para Não Chorar",
-            "Bonga - Olhos Molhados",
-            "Anselmo Ralph - Infelizmente",
-            "Yola Semedo - Hipocrisia",
-            "Matias Damásio - Como Antes"
+            "Bonga - Olhos Molhados"
         ]
 
-# Inicializa o catálogo
+# Inicializa o catálogo do MEGA
 catalogo_musicas = carregar_catalogo_real()
 
-# --- FORMULÁRIO EM ABA ÚNICA ---
-with st.form("form_karaoke_unico"):
+# =========================================================
+# OPERAÇÃO EM PASSO A PASSO (FLUXO EM ABA ÚNICA)
+# =========================================================
+
+# 1º Nome do Cantor
+cantor = st.text_input("1º Nome do Cantor (Seu Nome):", placeholder="Ex: Fausto Fortes")
+
+# 2º Pesquisar Música
+busca_musica = st.text_input("2º Pesquisar Música (Digite o nome da música ou artista):", placeholder="Ex: Paulo Flores").strip()
+
+# Variável para guardar o que vai para o DJ
+musica_final = ""
+
+if busca_musica:
+    # Filtra o catálogo do MEGA procurando o que o utilizador digitou
+    resultados = [m for m in catalogo_musicas if busca_musica.lower() in m.lower()]
     
-    # 1º Nome do Cantor (Quem vai cantar no evento)
-    cantor = st.text_input("1º Nome do Cantor (Seu Nome):", placeholder="Ex: Fausto Fortes")
-    
-    # 2º Pesquisar Música (Campo de busca integrado)
-    busca_musica = st.text_input("2º Pesquisar Música (Digite o nome ou artista):", placeholder="Ex: Vou Cantar").strip()
-    
-    # Sistema de feedback visual em tempo real dentro do formulário
-    musica_selecionada = ""
-    if busca_musica:
-        resultados = [m for m in catalogo_musicas if busca_musica.lower() in m.lower()]
-        if resultados:
-            st.markdown(f"**🟢 Encontradas no MEGA:**")
-            # Cria uma caixa de seleção dinâmica com o que foi encontrado na nuvem
-            musica_selecionada = st.selectbox("Escolha a música exata da lista:", resultados)
-        else:
-            st.markdown("**🔴 Música não encontrada no acervo do MEGA.**")
-            st.caption("Você pode tentar enviar mesmo assim, mas confirme se o DJ possui o arquivo.")
-            # Se não achar, assume o que o usuário digitou no campo de busca
-            musica_selecionada = busca_musica
-    
-    # 3º Enviar pedido
-    btn_enviar = st.form_submit_button("3º Enviar Pedido 🚀")
+    if resultados:
+        st.markdown("⬇️ **Músicas encontradas na sua nuvem MEGA. Selecione a desejada:**")
+        # Cria a lista de escolha com as opções encontradas
+        musica_final = st.selectbox("Escolha a versão exata:", resultados, key="selecao_resultado")
+    else:
+        st.error("❌ Nenhuma música encontrada com esse nome no acervo do MEGA.")
+        st.info("Nota: Pode avançar e enviar o pedido assim mesmo se o DJ tiver o ficheiro local.")
+        musica_final = busca_musica
+else:
+    musica_final = ""
+
+st.write("---")
+
+# 3º Enviar pedido
+btn_enviar = st.button("3º Enviar Pedido 🚀", use_container_width=True)
 
 # --- PROCESSAMENTO DO ENVIO ---
 if btn_enviar:
     if not cantor:
-        st.error("⚠️ Por favor, digite o seu nome (1º campo) antes de enviar.")
+        st.error("⚠️ Por favor, digite o seu nome no **1º campo** antes de enviar.")
     elif not busca_musica:
-        st.error("⚠️ Por favor, pesquise e escolha uma música (2º campo) antes de enviar.")
+        st.error("⚠️ Por favor, pesquise e selecione uma música no **2º campo**.")
     else:
-        # Envia o nome de quem canta e a música final selecionada
+        # Envia os dados limpos para o Firebase
         dados = {
             "cantor": cantor.strip(),
-            "musica": musicas_selecionada if musica_selecionada else busca_musica.strip()
+            "musica": musica_final.strip() if musica_final else busca_musica.strip()
         }
         
         try:
             resposta = requests.post(URL_FIREBASE, data=json.dumps(dados), timeout=5)
             if respuesta.status_code == 200:
-                st.success(f"🎉 Sucesso! Pedido de **{dados['musica']}** enviado para a fila do DJ!")
+                st.success(f"🎉 Perfeito! Pedido de **{dados['musica']}** enviado com sucesso para a fila!")
+                st.balloons() # Animação de sucesso no ecrã
             else:
-                st.error("❌ Erro ao processar o pedido na nuvem. Tente novamente.")
+                st.error("❌ Erro ao processar o pedido. Tente novamente.")
         except Exception as e:
-            st.error(f"Erro de comunicação: {e}")
+            st.error(f"Erro de comunicação com o Firebase: {e}")
