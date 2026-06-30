@@ -1,95 +1,66 @@
 import streamlit as st
 import requests
 import json
+import time
 
-# --- CONFIGURAÇÕES ---
-URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
+# Configurações do Firebase
+URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedido.json"
 URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
 
-# Configuração da página
-st.set_page_config(page_title="FF Karaoke Cloud", page_icon="🎤", layout="centered")
+st.set_page_config(page_title="FF Karaoke Cloud", layout="wide")
+
+# --- INICIALIZAÇÃO DE SESSÃO ---
+if 'nome_cliente' not in st.session_state: st.session_state.nome_cliente = ""
+if 'foto_cliente' not in st.session_state: st.session_state.foto_cliente = None
 
 st.title("🎤 FF KARAOKE CLOUD")
-st.write("Preencha os campos na ordem abaixo para enviar o seu pedido:")
-st.write("---")
 
-# --- FUNÇÃO PARA CARREGAR AS MÚSICAS DIRETO DO FIREBASE ---
-@st.cache_data(ttl=300) # Atualiza a lista a cada 5 minutos
-def carregar_catalogo_firebase():
-    try:
-        resposta = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
-        if resposta.status_code == 200 and resposta.json():
-            return resposta.json()
-    except:
-        pass
-    # Lista de segurança caso o Firebase esteja vazio temporariamente
-    return [
-        "Paulo Flores - Garina",
-        "Paulo Flores - Poema do Semba",
-        "Fausto Fortes - Vou Cantar Para Não Chorar",
-        "Bonga - Olhos Molhados"
-    ]
-
-# Inicializa o catálogo vindo da nuvem segura
-catalogo_musicas = carregar_catalogo_firebase()
-
-# =========================================================
-# OPERAÇÃO EM PASSO A PASSO
-# =========================================================
-
-# 1º Nome do Cantor
-cantor = st.text_input("1º Nome do Cantor (Seu Nome):", placeholder="Ex: Fausto Fortes")
-
-# 2º Pesquisar Música
-busca_musica = st.text_input("2º Pesquisar Música (Digite o nome da música ou artista):", placeholder="Ex: Paulo Flores").strip()
-
-# Variáveis de controlo
-musica_final = ""
-modo_manual = False
-
-if busca_musica:
-    # Filtra o catálogo procurando o que o utilizador digitou
-    resultados = [m for m in catalogo_musicas if busca_musica.lower() in m.lower()]
+# --- LOGIN / PERFIL DO CANTOR ---
+with st.sidebar:
+    st.header("👤 Perfil do Cantor")
+    nome_input = st.text_input("Teu Nome:", value=st.session_state.nome_cliente)
+    foto_file = st.file_uploader("Escolher Foto:", type=['jpg', 'png'])
     
-    if resultados:
-        st.markdown("⬇ *Músicas encontradas na sua nuvem. Selecione a desejada:*")
-        musica_final = st.selectbox("Escolha a versão exata:", resultados, key="selecao_resultado")
-    else:
-        # Se NÃO encontrar nenhuma correspondência
-        st.error("❌ Essa música não está disponível no nosso acervo da nuvem MEGA.")
-        modo_manual = True
+    if st.button("Guardar Perfil"):
+        st.session_state.nome_cliente = nome_input
+        if foto_file: st.session_state.foto_cliente = foto_file.getvalue()
+        st.success("Perfil Guardado!")
+
+# --- ÁREA DO PEDIDO ---
+if st.session_state.nome_cliente:
+    st.write(f"### Bem-vindo, {st.session_state.nome_cliente}!")
+    if st.session_state.foto_cliente:
+        st.image(st.session_state.foto_cliente, width=100)
+    
+    catalogo = requests.get(URL_FIREBASE_CATALOGO).json() or {}
+    
+    with st.form("form_pedido", clear_on_submit=True):
+        musica = st.selectbox("Escolha a música:", ["-- Selecione --"] + list(catalogo.keys()))
+        btn = st.form_submit_button("🚀 Enviar Pedido")
         
-        st.write("---")
-        st.subheader("📝 Pedido Manual")
-        pedido_manual = st.text_input("Introduza o nome da música desejada para verificação do DJ:", value=busca_musica)
-        musica_final = pedido_manual
+        if btn and musica != "-- Selecione --":
+            pedido = {
+                "cantor": st.session_state.nome_cliente,
+                "musica": musica,
+                "arquivo_real": catalogo[musica],
+                "timestamp": time.time()
+            }
+            requests.post(URL_FIREBASE_PEDIDOS, json=pedido)
+            st.success(f"Pedido de '{musica}' enviado!")
 
-st.write("---")
+# --- SEGUNDA TELA (Simulação de Anúncio) ---
+st.markdown("---")
+st.header("📺 Ecrã do DJ (Próximo Cantor)")
 
-# 3º Enviar pedido
-btn_enviar = st.button("3º Enviar Pedido 🚀", use_container_width=True)
-
-# --- PROCESSAMENTO DO ENVIO ---
-if btn_enviar:
-    if not cantor:
-        st.error("⚠️ Por favor, digite o seu nome no 1º campo antes de enviar.")
-    elif not busca_musica:
-        st.error("⚠️ Por favor, pesquise e selecione uma música no 2º campo.")
-    else:
-        dados = {
-            "cantor": cantor.strip(),
-            "musica": musica_final.strip()
-        }
-        
-        try:
-            resposta = requests.post(URL_FIREBASE_PEDIDOS, data=json.dumps(dados), timeout=5)
-            if resposta.status_code == 200:
-                if modo_manual:
-                    st.warning("⚠️ Seu pedido foi enviado, mas não temos a certeza que ela esteja disponível em Karaoke.")
-                else:
-                    st.success(f"🎉 Perfeito! Pedido de **{dados['musica']}** enviado com sucesso para a fila!")
-                    st.balloons()
-            else:
-                st.error("❌ Erro ao processar o pedido. Tente novamente.")
-        except Exception as e:
-            st.error(f"Erro de comunicação com o Firebase: {e}")
+# Aqui vamos buscar os pedidos para numerá-los
+pedidos_raw = requests.get(URL_FIREBASE_PEDIDOS).json() or {}
+if pedidos_raw:
+    lista_pedidos = list(pedidos_raw.values())
+    for i, p in enumerate(lista_pedidos, 1):
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.metric("Pedido", f"#{i}")
+        with col2:
+            st.write(f"**Cantor:** {p['cantor']} | **Música:** {p['musica']}")
+else:
+    st.info("Nenhum pedido na fila.")
