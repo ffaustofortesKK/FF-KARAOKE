@@ -61,7 +61,7 @@ if busca_musica:
         
         st.write("---")
         st.subheader("📝 Pedido Manual")
-        pedido_manual = st.text_input("Introduza o nome da música desejada para verificação do DJ:", value=busca_musica)
+        pedido_manual = st.text_input("Introduza o nome da música desejada para verificação do DJ, Seu pedido foi enviado, mais não temos a certeza que ela esteja disponível em Karaoke:", value=busca_musica)
         musica_final = pedido_manual
 
 st.write("---")
