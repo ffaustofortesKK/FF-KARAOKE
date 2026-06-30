@@ -2,94 +2,90 @@ import streamlit as st
 import requests
 import json
 
-# --- CONFIGURAÇÕES ---
-URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
+# --- CONFIGURAÇÕES DO FIREBASE ---
+URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedido.json"
 URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
 
-# Configuração da página
-st.set_page_config(page_title="FF Karaoke Cloud", page_icon="🎤", layout="centered")
-
 st.title("🎤 FF KARAOKE CLOUD")
-st.write("Preencha os campos na ordem abaixo para enviar o seu pedido:")
-st.write("---")
+st.subheader("Faz o teu pedido de música em tempo real!")
 
-# --- FUNÇÃO PARA CARREGAR AS MÚSICAS DIRETO DO FIREBASE ---
-@st.cache_data(ttl=300) # Atualiza a lista a cada 5 minutos
-def carregar_catalogo_firebase():
+# 1. Procurar o catálogo atualizado no Firebase
+@st.cache_data(ttl=60)  # Atualiza a lista a cada 60 segundos
+def carregar_catalogo():
     try:
         resposta = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
-        if resposta.status_code == 200 and resposta.json():
-            return resposta.json()
+        if resposta.status_code == 200:
+            dados = resposta.json()
+            return dados if dados else {}
     except:
         pass
-    # Lista de segurança caso o Firebase esteja vazio temporariamente
-    return [
-        "Paulo Flores - Garina",
-        "Paulo Flores - Poema do Semba",
-        "Fausto Fortes - Vou Cantar Para Não Chorar",
-        "Bonga - Olhos Molhados"
-    ]
+    return {}
 
-# Inicializa o catálogo vindo da nuvem segura
-catalogo_musicas = carregar_catalogo_firebase()
+catalogo = carregar_catalogo()
 
-# =========================================================
-# OPERAÇÃO EM PASSO A PASSO
-# =========================================================
-
-# 1º Nome do Cantor
-cantor = st.text_input("1º Nome do Cantor (Seu Nome):", placeholder="Ex: Fausto Fortes")
-
-# 2º Pesquisar Música
-busca_musica = st.text_input("2º Pesquisar Música (Digite o nome da música ou artista):", placeholder="Ex: Paulo Flores").strip()
-
-# Variáveis de controlo
-musica_final = ""
-modo_manual = False
-
-if busca_musica:
-    # Filtra o catálogo procurando o que o utilizador digitou
-    resultados = [m for m in catalogo_musicas if busca_musica.lower() in m.lower()]
+# Criar o formulário no site
+with st.form("form_pedido"):
+    nome_cliente = st.text_input("Teu Nome / Nome da Mesa:", placeholder="Ex: Fausto / Mesa 2")
     
-    if resultados:
-        st.markdown("⬇ *Músicas encontradas na sua nuvem. Selecione a desejada:*")
-        musica_final = st.selectbox("Escolha a versão exata:", resultados, key="selecao_resultado")
-    else:
-        # Se NÃO encontrar nenhuma correspondência
-        st.error("❌ Essa música não está disponível no nosso acervo da nuvem MEGA.")
-        modo_manual = True
+    st.write("---")
+    st.markdown("### 🎵 Escolha a sua Música")
+    
+    if catalogo:
+        # Pega nos nomes limpos (chaves do dicionário) para o cliente pesquisar
+        opcoes_musicas = list(catalogo.keys())
         
-        st.write("---")
-        st.subheader("📝 Pedido Manual")
-        pedido_manual = st.text_input("Introduza o nome da música desejada para verificação do DJ:", value=busca_musica)
-        musica_final = pedido_manual
-
-st.write("---")
-
-# 3º Enviar pedido
-btn_enviar = st.button("3º Enviar Pedido 🚀", use_container_width=True)
-
-# --- PROCESSAMENTO DO ENVIO ---
-if btn_enviar:
-    if not cantor:
-        st.error("⚠️ Por favor, digite o seu nome no 1º campo antes de enviar.")
-    elif not busca_musica:
-        st.error("⚠️ Por favor, pesquise e selecione uma música no 2º campo.")
-    else:
-        dados = {
-            "cantor": cantor.strip(),
-            "musica": musica_final.strip()
-        }
+        # Cria a barra de pesquisa inteligente com os nomes limpos (Ex: "Anselmo Meu Amor")
+        musica_selecionada = st.selectbox(
+            "Pesquise pelo Artista ou Nome da Música:",
+            options=["-- Selecione uma música --"] + opcoes_musicas
+        )
         
-        try:
-            resposta = requests.post(URL_FIREBASE_PEDIDOS, data=json.dumps(dados), timeout=5)
-            if resposta.status_code == 200:
-                if modo_manual:
-                    st.warning("⚠️ Seu pedido foi enviado, mas não temos a certeza que ela esteja disponível em Karaoke.")
+        # Opção alternativa se não encontrar
+        musica_manual = ""
+        if musica_selecionada == "-- Selecione uma música --":
+            st.info("💡 Não encontras a tua música? Podes digitar o nome manualmente abaixo:")
+            musica_manual = st.text_input("Digitar música manualmente (Artista - Título):")
+    else:
+        st.warning("⚠️ Não foi possível carregar o catálogo automático. Digita abaixo:")
+        musica_manual = st.text_input("Artista - Título da Música:")
+        musica_selecionada = "-- Selecione uma música --"
+
+    # Botão de envio
+    botao_enviar = st.form_submit_button("🚀 Enviar Pedido para o DJ")
+
+# 2. Processar o envio do pedido quando o botão for clicado
+if botao_enviar:
+    if not nome_cliente.strip():
+        st.error("❌ Por favor, digita o teu nome ou mesa antes de enviar.")
+    else:
+        # Define qual o texto e o arquivo real que vão para o DJ
+        nome_musica_final = ""
+        arquivo_hd_real = "Manual"
+        
+        if musica_selecionada != "-- Selecione uma música --":
+            nome_musica_final = musica_selecionada
+            # Resgata o nome com pontos original (Ex: "Anselmo.Meu amor.mp4") para o teu HD dar Play
+            arquivo_hd_real = catalogo[musica_selecionada]
+        elif musica_manual.strip():
+            nome_musica_final = musica_manual.strip()
+        
+        if not nome_musica_final:
+            st.error("❌ Por favor, seleciona uma música ou digita uma manualmente.")
+        else:
+            # Cria o pacote de dados estruturado para o Firebase
+            dados_pedido = {
+                "cantor": nome_cliente.strip(),
+                "musica": nome_musica_final,
+                "arquivo_real": arquivo_hd_real,
+                "timestamp": time.time() if 'time' in globals() else None
+            }
+            
+            # Envia para o nó de pedidos do Firebase
+            try:
+                envio = requests.post(URL_FIREBASE_PEDIDOS, json=dados_pedido, timeout=5)
+                if envio.status_code == 200:
+                    st.success(f"🎉 Perfeito, {nome_cliente}! O teu pedido de '{nome_musica_final}' foi enviado. Aguarda a tua vez!")
                 else:
-                    st.success(f"🎉 Perfeito! Pedido de **{dados['musica']}** enviado com sucesso para a fila!")
-                    st.balloons()
-            else:
-                st.error("❌ Erro ao processar o pedido. Tente novamente.")
-        except Exception as e:
-            st.error(f"Erro de comunicação com o Firebase: {e}")
+                    st.error("❌ Erro ao enviar para a nuvem. Tenta novamente.")
+            except Exception as e:
+                st.error(f"❌ Erro de conexão: {e}")
