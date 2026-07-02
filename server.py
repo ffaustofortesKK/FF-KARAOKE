@@ -1,86 +1,69 @@
 import time
-
 import requests
-
-import pyautogui # Instale com: pip install pyautogui
-
-import pygetwindow as gw # Instale com: pip install pygetwindow
-
-
+import os
+import subprocess
+import shutil
 
 # --- CONFIGURAÇÕES ---
-
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedido.json"
+PASTA_MUSICAS_LOCAL = r"G:\F.F KARAOKE"
+PASTA_TEMP = r"C:\KaraokeTemp"
 
-# Escreva exatamente o nome que aparece no topo da janela do seu programa de Karaoke
+# Garante que a pasta temporária existe
+if not os.path.exists(PASTA_TEMP):
+    os.makedirs(PASTA_TEMP)
 
-NOME_JANELA_KARAOKE = "NomeDoSeuProgramaDeKaraoke" 
-
-
-
-def enviar_para_karaoke(nome_musica):
-
-    try:
-
-        # Tenta encontrar a janela do programa de karaoke
-
-        janela = gw.getWindowsWithTitle(NOME_JANELA_KARAOKE)[0]
-
-        janela.activate() # Traz o programa para a frente
-
-        time.sleep(1)
-
-        
-
-        # Escreve o nome da música e pressiona Enter
-
-        pyautogui.write(nome_musica)
-
-        pyautogui.press('enter')
-
-        print(f"✅ Nome da música digitado no programa: {nome_musica}")
-
-        return True
-
-    except Exception as e:
-
-        print(f"❌ Erro ao controlar o programa: {e}")
-
-        return False
-
-
-
-# --- LOOP PRINCIPAL ---
-
-while True:
-
-    try:
-
-        resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
-
-        if resp.status_code == 200 and resp.json():
-
-            dados = resp.json()
-
-            musica = dados.get("musica", "").strip()
-
+def tocar_musica_local(musica_pedido):
+    """Copia a música para um nome simples e abre-a."""
+    print(f"\n🔍 À procura de: {musica_pedido}")
+    
+    for arquivo in os.listdir(PASTA_MUSICAS_LOCAL):
+        if musica_pedido.lower().strip() in arquivo.lower().strip():
+            caminho_origem = os.path.join(PASTA_MUSICAS_LOCAL, arquivo)
+            caminho_destino = os.path.join(PASTA_TEMP, "temp_karaoke.mp4")
             
-
-            if musica:
-
-                # Remove a extensão para não atrapalhar a busca
-
-                nome_limpo = musica.replace(".mp4", "").replace(".mp3", "")
-
-                enviar_para_karaoke(nome_limpo)
-
+            print(f"▶️ Ficheiro encontrado: {arquivo}")
+            
+            try:
+                # Copia o ficheiro original para um nome "limpo"
+                shutil.copy2(caminho_origem, caminho_destino)
                 
+                # Abre o ficheiro limpo usando o comando 'start' do Windows
+                cmd = f'start "" "{caminho_destino}"'
+                subprocess.Popen(cmd, shell=True)
+                
+                print("✅ Ficheiro copiado e enviado para o player com sucesso.")
+                return True
+            except Exception as e:
+                print(f"❌ Erro ao copiar ou abrir: {e}")
+                return False
+    
+    print("❌ Música não encontrada na pasta local.")
+    return False
 
-                requests.delete(URL_FIREBASE_PEDIDOS)
-
-    except:
-
-        pass
-
-    time.sleep(3)
-
+if __name__ == "__main__":
+    print(f"🎤 MONITOR FF KARAOKE ATIVO")
+    print(f"Origem: {PASTA_MUSICAS_LOCAL}")
+    print(f"Destino Temp: {PASTA_TEMP}")
+    print("----------------------------")
+    
+    while True:
+        try:
+            # Busca pedido na nuvem
+            resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
+            if resp.status_code == 200 and resp.json():
+                dados = resp.json()
+                musica = dados.get("musica", "").strip()
+                
+                if musica:
+                    print(f"\n🚀 Novo Pedido: {musica}")
+                    sucesso = tocar_musica_local(musica)
+                    
+                    # Limpa o pedido da nuvem após o processamento
+                    requests.delete(URL_FIREBASE_PEDIDOS)
+                    print("🧹 Pedido removido da nuvem.")
+        
+        except Exception as e:
+            print(f"Erro de conexão: {e}")
+            
+        time.sleep(3)
