@@ -1,47 +1,88 @@
 import time
 import requests
+import json
 import os
+from mega import Mega
 
-# CONFIGURAÇÕES
+# --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedido.json"
-PASTA_LOCAL = r"G:\F.F KARAOKE"
+URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
+PASTA_MUSICAS_LOCAL = r"G:\F.F KARAOKE"
+LINK_PASTA_MEGA = "https://mega.nz/folder/xxxxxx#yyyyyy" 
 
-def verificar_e_tocar():
+def atualizar_catalogo_no_firebase():
+    print("\n🔄 [MEGA] A ler a pasta de Karaoke na nuvem...")
     try:
-        resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
-        if resp.status_code == 200 and resp.json():
-            dados = resp.json()
-            # Nome vindo da nuvem (ex: "amor.mp4")
-            musica_nuvem = dados.get("musica", "").strip()
+        mega = Mega()
+        m_anonimo = mega.login() 
+        arquivos = m_anonimo.get_files_from_url(LINK_PASTA_MEGA)
+        
+        lista_musicas = []
+        if arquivos:
+            for file_id, file_info in arquivos.items():
+                nome = file_info.get('a', {}).get('n', '')
+                if nome and not nome.startswith('.'):
+                    lista_musicas.append(nome)
             
-            if musica_nuvem:
-                print(f"\n🎵 Pedido recebido: {musica_nuvem}")
-                
-                # Vamos procurar um ficheiro que contenha o nome pedido
-                # Se o pedido for "amor.mp4", ele procura qualquer ficheiro que tenha "amor" no nome
-                nome_base = musica_nuvem.replace(".mp4", "").replace(".mp3", "")
-                
-                ficheiro_encontrado = None
-                for arquivo in os.listdir(PASTA_LOCAL):
-                    if nome_base.lower() in arquivo.lower():
-                        ficheiro_encontrado = os.path.join(PASTA_LOCAL, arquivo)
-                        break
-                
-                if ficheiro_encontrado:
-                    print(f"✅ Ficheiro correspondente encontrado: {ficheiro_encontrado}")
-                    os.startfile(ficheiro_encontrado)
-                else:
-                    print(f"❌ ERRO: Não encontrei nenhum ficheiro que contenha '{nome_base}' na pasta.")
-
-                # Apaga o pedido após tentar processar
-                requests.delete(URL_FIREBASE_PEDIDOS)
-                print("🧹 Pedido processado.")
-                
+            lista_musicas.sort()
+            requests.put(URL_FIREBASE_CATALOGO, json=lista_musicas)
+            print(f"✅ [SUCESSO] {len(lista_musicas)} músicas atualizadas no Firebase!")
     except Exception as e:
-        print(f"Erro na conexão: {e}")
+        print(f"❌ Erro ao ler o MEGA: {e}")
+
+def tocar_musica_local(musica_pedido):
+    """Procura o ficheiro na pasta local e abre-o."""
+    print(f"🔍 Procurando por: {musica_pedido} na pasta {PASTA_MUSICAS_LOCAL}")
+    
+    # Lista todos os ficheiros da pasta G:\
+    for ficheiro in os.listdir(PASTA_MUSICAS_LOCAL):
+        # Compara apenas o nome (ignorando maiúsculas e minúsculas)
+        if musica_pedido.lower() in ficheiro.lower():
+            caminho_completo = os.path.join(PASTA_MUSICAS_LOCAL, ficheiro)
+            print(f"▶️ A abrir: {caminho_completo}")
+            try:
+                os.startfile(caminho_completo) # Abre com o player padrão do Windows
+                return True
+            except Exception as e:
+                print(f"Erro ao abrir ficheiro: {e}")
+    return False
 
 if __name__ == "__main__":
-    print(f"Monitor ativo. À espera de pedidos em {PASTA_LOCAL}...")
+    print("🎤 FF KARAOKE CLOUD — Monitor Iniciado")
+    atualizar_catalogo_no_firebase()
+    
+    print("\n🎧 [ESCUTA ATIVA] Aguardando pedidos...")
+    
     while True:
-        verificar_e_tocar()
+        try:
+            # 1. Busca pedido
+            resposta = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
+            if resposta.status_code == 200 and resposta.json():
+                pedidos = resposta.json()
+                
+                # Se o Firebase for uma lista ou dicionário, processamos
+                # Aqui assumimos que estás a apagar o pedido após ler
+                pedido = pedidos # Se for um único pedido
+                
+                cantor = pedido.get("cantor", "Desconhecido")
+                musica = pedido.get("musica", "")
+                
+                if musica:
+                    print(f"\n🚀 [NOVO PEDIDO] Cantor: {cantor} | Música: {musica}")
+                    
+                    # 2. Tenta tocar
+                    achou = tocar_musica_local(musica)
+                    
+                    if achou:
+                        print("✅ Música encontrada e enviada para o leitor!")
+                    else:
+                        print("⚠️ Música não encontrada na pasta G:\\. Verifique o nome!")
+                    
+                    # 3. Limpa o pedido do Firebase para não repetir
+                    requests.delete(URL_FIREBASE_PEDIDOS)
+                    print("🧹 Pedido removido da nuvem.")
+        
+        except Exception as e:
+            print(f"Erro de conexão: {e}")
+            
         time.sleep(3)
