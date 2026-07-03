@@ -38,8 +38,8 @@ st.markdown("""
 if 'registado' not in st.session_state: st.session_state.registado = False
 if 'resultados_busca' not in st.session_state: st.session_state.resultados_busca = None
 
-# --- CABEÇALHO ---
-st.markdown('<div class="logo-container"><img src="https://i.ibb.co/HfKTnDDQ/logoweb.png"></div>', unsafe_allow_html=True)
+# --- CABEÇALHO COM NOVO LOGOTIPO ---
+st.markdown('<div class="logo-container"><img src="https://cdn.phototourl.com/free/2026-07-03-793a0f18-6143-44c8-b56e-e44af828c30c.png"></div>', unsafe_allow_html=True)
 
 # --- FASE 1: REGISTO ---
 if not st.session_state.registado:
