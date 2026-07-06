@@ -18,7 +18,7 @@
                 st.markdown('<div class="success-box">O seu pedido foi enviado com sucesso!</div>', unsafe_allow_html=True)
                 st.balloons()
                 
-                # LIMPEZA: Apaga os resultados e força o rerun
+                # LIMPEZA
                 st.session_state.resultados = None
                 st.session_state.input_busca = "" 
                 st.rerun() 
@@ -31,7 +31,5 @@
             if manual:
                 requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": manual})
                 st.markdown('<div class="warning-box">O seu pedido foi enviado!</div>', unsafe_allow_html=True)
-                
-                # LIMPEZA: Reseta o campo manual
                 st.session_state.input_manual = ""
                 st.rerun()
