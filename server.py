@@ -20,8 +20,20 @@ st.markdown(f"""
     .confirma-social {{ color: white !important; text-shadow: 2px 2px 4px #000000; text-decoration: underline; font-weight: bold; }}
     label {{ color: white !important; font-weight: bold; }}
     div[data-baseweb="input"], div[data-baseweb="select"] {{ width: 40% !important; }}
-    /* Botoes Cinza Escuro */
-    div.stButton > button {{ background-color: #333333 !important; color: #FFFFFF !important; font-weight: bold; border: 1px solid #555; }}
+    
+    /* Botões Cinza Escuro com efeito Hover Amarelo */
+    div.stButton > button {{ 
+        background-color: #333333 !important; 
+        color: #FFFFFF !important; 
+        font-weight: bold; 
+        border: 1px solid #555; 
+        transition: 0.3s;
+    }}
+    div.stButton > button:hover {{ 
+        background-color: #FFD700 !important; 
+        color: #000000 !important; 
+    }}
+    
     .success-box {{ background-color: #008000; color: #FFFFFF; padding: 10px; border-radius: 5px; font-weight: bold; width: 40%; }}
     .warning-box {{ background-color: #DAA520; color: #000000; padding: 10px; border-radius: 5px; font-weight: bold; width: 40%; }}
     </style>
@@ -49,38 +61,41 @@ else:
     with col_main:
         st.markdown(f'<p style="color:#FFD700; font-weight:bold; font-size:20px;">Bem-vindo, {st.session_state.nome}!</p>', unsafe_allow_html=True)
         
-        # BUSCA COM FORMULÁRIO (Limpa sozinho)
-        with st.form("form_busca", clear_on_submit=True):
+        # --- BUSCA COM FORMULÁRIO (Limpeza automática) ---
+        with st.form("busca_form", clear_on_submit=True):
             busca = st.text_input("Título / Cantor:")
-            col_b1, col_b2 = st.columns([1, 4])
-            with col_b1:
-                btn_pesquisar = st.form_submit_button("Pesquisar")
-            with col_b2:
-                btn_limpar = st.form_submit_button("Limpar Pesquisa")
-            
-            if btn_pesquisar and busca:
-                try:
-                    resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
-                    dados = resp.json()
-                    cat = list(dados.keys()) if isinstance(dados, dict) else dados
-                    st.session_state.resultados = [m for m in cat if busca.lower() in m.lower()]
-                except: pass
-            if btn_limpar:
+            cols_btn = st.columns(2)
+            if cols_btn[0].form_submit_button("Pesquisar"):
+                if busca:
+                    try:
+                        resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
+                        dados = resp.json()
+                        cat = list(dados.keys()) if isinstance(dados, dict) else dados
+                        st.session_state.resultados = [m for m in cat if busca.lower() in m.lower()]
+                        st.rerun()
+                    except: pass
+            if cols_btn[1].form_submit_button("Limpar Pesquisa"):
                 st.session_state.resultados = None
+                st.rerun()
 
+        # --- SELEÇÃO ---
         if 'resultados' in st.session_state and st.session_state.resultados:
             escolha = st.selectbox("Selecione a música:", st.session_state.resultados)
-            if st.button("Confirmar Pedido"):
+            col_b1, col_b2 = st.columns(2)
+            if col_b1.button("Confirmar Pedido"):
                 requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
-                st.markdown('<div class="success-box">Pedido enviado! 🎶🎵🎶🎵</div>', unsafe_allow_html=True)
+                st.markdown('<div class="success-box">Pedido enviado! 🎵🎶🎵</div>', unsafe_allow_html=True)
                 st.balloons()
                 st.session_state.resultados = None
                 st.rerun()
+            if col_b2.button("Limpar Pedido"):
+                st.session_state.resultados = None
+                st.rerun()
         
-        # MANUAL COM FORMULÁRIO (Limpa sozinho)
-        with st.form("form_manual", clear_on_submit=True):
-            st.markdown("<label>Título/Cantor não listado:</label>", unsafe_allow_html=True)
-            manual = st.text_input("Manual:")
+        # --- MANUAL ---
+        st.markdown("<br><label>Pedido Manual:</label>", unsafe_allow_html=True)
+        with st.form("manual_form", clear_on_submit=True):
+            manual = st.text_input("Digite o nome da música:")
             if st.form_submit_button("Enviar Pedido Manual"):
                 if manual:
                     requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": manual})
