@@ -18,24 +18,19 @@ st.markdown(f"""
         background-repeat: no-repeat; background-size: contain; opacity: 0.1; z-index: -1;
     }}
     .confirma-social {{ color: white !important; text-shadow: 2px 2px 4px #000000; text-decoration: underline; font-weight: bold; }}
+    
+    /* Botões Amarelos com letra Preta */
+    div.stButton > button {{ background-color: #FFD700 !important; color: #000000 !important; font-weight: bold !important; }}
+    
     label {{ color: white !important; font-weight: bold; }}
     div[data-baseweb="input"], div[data-baseweb="select"] {{ width: 50% !important; }}
-    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {{
-        background-color: #FFFFFF !important; color: #000000 !important;
-        border: 2px solid #D4AF37 !important; height: 40px !important;
-    }}
     input {{ color: #000000 !important; font-weight: bold; }}
-    
-    /* Botões Amarelos com Letras Pretas */
-    div.stButton > button {{ background-color: #FFD700 !important; color: #000000 !important; font-weight: bold; border: none; }}
-    
     .success-box {{ background-color: #008000; color: #FFFFFF; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 10px; width: 50%; }}
     .warning-box {{ background-color: #DAA520; color: #000000; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 10px; width: 50%; }}
     </style>
 """, unsafe_allow_html=True)
 
 if 'registado' not in st.session_state: st.session_state.registado = False
-if 'resultados' not in st.session_state: st.session_state.resultados = None
 
 st.markdown(f'<div style="display:flex; justify-content:center;"><img src="{LINK_LOGO}" width="250"></div>', unsafe_allow_html=True)
 
@@ -57,39 +52,42 @@ else:
         st.markdown(f'<p style="color:#FFD700; font-weight:bold; font-size:24px;">Bem-vindo, {st.session_state.nome}!</p>', unsafe_allow_html=True)
         
         # BUSCA
-        busca = st.text_input("Título / Cantor:", key="input_busca")
-        c1, c2 = st.columns([1, 4])
-        if c1.button("Pesquisar"):
-            try:
-                resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
-                dados = resp.json()
-                cat = list(dados.keys()) if isinstance(dados, dict) else dados
-                st.session_state.resultados = [m for m in cat if busca.lower() in m.lower()]
-                st.rerun()
-            except: pass
-        if c2.button("Limpar Pesquisa"):
-            st.session_state.resultados = None
-            st.session_state.input_busca = ""
-            st.rerun()
-
-        if st.session_state.resultados:
-            escolha = st.selectbox("Selecione a música:", st.session_state.resultados, key="select_musica")
-            c3, c4 = st.columns([1, 4])
-            if c3.button("Confirmar Pedido"):
-                requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
-                st.balloons()
+        with st.form("form_busca", clear_on_submit=True):
+            busca = st.text_input("Título / Cantor:")
+            c1, c2 = st.columns(2)
+            if c1.form_submit_button("Pesquisar"):
+                try:
+                    resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
+                    dados = resp.json()
+                    cat = list(dados.keys()) if isinstance(dados, dict) else dados
+                    st.session_state.resultados = [m for m in cat if busca.lower() in m.lower()]
+                    st.rerun()
+                except: pass
+            if c2.form_submit_button("Limpar Pesquisa"):
                 st.session_state.resultados = None
                 st.rerun()
-            if c4.button("Limpar Pedido"):
+
+        if 'resultados' in st.session_state and st.session_state.resultados:
+            escolha = st.selectbox("Selecione a música:", st.session_state.resultados)
+            c1, c2 = st.columns(2)
+            if c1.button("Confirmar Pedido"):
+                requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
+                st.markdown('<div class="success-box">Pedido enviado com sucesso! 🎵</div>', unsafe_allow_html=True)
+                st.session_state.resultados = None
+                st.rerun()
+            if c2.button("Limpar Pedido"):
                 st.session_state.resultados = None
                 st.rerun()
         
         # PEDIDO MANUAL
-        manual = st.text_input("Título não listado:", key="input_manual")
-        if st.button("Enviar Pedido Manual"):
-            if manual:
-                requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": manual})
-                st.success("Pedido enviado!")
+        with st.form("form_manual", clear_on_submit=True):
+            manual = st.text_input("Título/Cantor (Manual):")
+            c1, c2 = st.columns(2)
+            if c1.form_submit_button("Enviar Pedido Manual"):
+                if manual:
+                    requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": manual})
+                    st.markdown('<div class="warning-box">Seu pedido foi enviado, mas nem todas as musicas existem na versão Karaoke.</div>', unsafe_allow_html=True)
+            if c2.form_submit_button("Limpar"):
                 st.rerun()
 
     with col_cam:
