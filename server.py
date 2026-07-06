@@ -1,4 +1,8 @@
-with col_main:
+else:
+    # DEFINA AS COLUNAS ANTES DE USAR 'with col_main'
+    col_main, col_cam = st.columns([2, 1])
+    
+    with col_main:
         st.markdown(f'<p style="color:#FFD700; font-weight:bold; font-size:24px;">Bem-vindo, {st.session_state.nome}!</p>', unsafe_allow_html=True)
         
         # --- BUSCA E PEDIDO ---
