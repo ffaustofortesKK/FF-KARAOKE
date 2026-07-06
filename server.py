@@ -1,4 +1,7 @@
-# --- BUSCA E PEDIDO ---
+with col_main:
+        st.markdown(f'<p style="color:#FFD700; font-weight:bold; font-size:24px;">Bem-vindo, {st.session_state.nome}!</p>', unsafe_allow_html=True)
+        
+        # --- BUSCA E PEDIDO ---
         busca = st.text_input("Título / Cantor:", key="input_busca")
         
         if st.button("Pesquisar"):
@@ -8,7 +11,8 @@
                 cat = list(dados.keys()) if isinstance(dados, dict) else dados
                 st.session_state.resultados = [m for m in cat if busca.lower() in m.lower()]
                 st.rerun()
-            except: pass
+            except: 
+                pass
 
         if 'resultados' in st.session_state and st.session_state.resultados:
             escolha = st.selectbox("Selecione a música:", st.session_state.resultados, key="select_musica")
