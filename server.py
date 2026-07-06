@@ -19,15 +19,14 @@ st.markdown(f"""
     }}
     .confirma-social {{ color: white !important; text-shadow: 2px 2px 4px #000000; text-decoration: underline; font-weight: bold; }}
     label {{ color: white !important; font-weight: bold; }}
-    div[data-baseweb="input"], div[data-baseweb="select"] {{ width: 40% !important; }}
+    div[data-baseweb="input"] {{ width: 40% !important; }}
     
     /* Botões Cinza Escuro com efeito Hover Amarelo */
     div.stButton > button {{ 
         background-color: #333333 !important; 
         color: #FFFFFF !important; 
         font-weight: bold; 
-        border: 1px solid #555; 
-        transition: 0.3s;
+        border: 1px solid #555;
     }}
     div.stButton > button:hover {{ 
         background-color: #FFD700 !important; 
@@ -57,49 +56,41 @@ if not st.session_state.registado:
             st.rerun()
 else:
     col_main, col_cam = st.columns([2, 1])
-    
     with col_main:
         st.markdown(f'<p style="color:#FFD700; font-weight:bold; font-size:20px;">Bem-vindo, {st.session_state.nome}!</p>', unsafe_allow_html=True)
         
-        # --- BUSCA COM FORMULÁRIO (Limpeza automática) ---
+        # BUSCA COM FORMULÁRIO (Limpa automaticamente)
         with st.form("busca_form", clear_on_submit=True):
             busca = st.text_input("Título / Cantor:")
-            cols_btn = st.columns(2)
-            if cols_btn[0].form_submit_button("Pesquisar"):
+            col_b1, col_b2 = st.columns(2)
+            if col_b1.form_submit_button("Pesquisar"):
                 if busca:
-                    try:
-                        resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
-                        dados = resp.json()
-                        cat = list(dados.keys()) if isinstance(dados, dict) else dados
-                        st.session_state.resultados = [m for m in cat if busca.lower() in m.lower()]
-                        st.rerun()
-                    except: pass
-            if cols_btn[1].form_submit_button("Limpar Pesquisa"):
+                    resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
+                    dados = resp.json()
+                    cat = list(dados.keys()) if isinstance(dados, dict) else dados
+                    st.session_state.resultados = [m for m in cat if busca.lower() in m.lower()]
+                    st.rerun()
+            if col_b2.form_submit_button("Limpar Pesquisa"):
                 st.session_state.resultados = None
                 st.rerun()
 
-        # --- SELEÇÃO ---
         if 'resultados' in st.session_state and st.session_state.resultados:
-            escolha = st.selectbox("Selecione a música:", st.session_state.resultados)
-            col_b1, col_b2 = st.columns(2)
-            if col_b1.button("Confirmar Pedido"):
+            escolha = st.selectbox("Selecione:", st.session_state.resultados, key="sel_musica")
+            if st.button("Confirmar Pedido"):
                 requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
-                st.markdown('<div class="success-box">Pedido enviado! 🎵🎶🎵</div>', unsafe_allow_html=True)
+                st.markdown('<div class="success-box">Pedido enviado! 🎵🎶🎵🎶</div>', unsafe_allow_html=True)
                 st.balloons()
                 st.session_state.resultados = None
                 st.rerun()
-            if col_b2.button("Limpar Pedido"):
-                st.session_state.resultados = None
-                st.rerun()
         
-        # --- MANUAL ---
-        st.markdown("<br><label>Pedido Manual:</label>", unsafe_allow_html=True)
+        # MANUAL COM FORMULÁRIO (Limpa automaticamente)
         with st.form("manual_form", clear_on_submit=True):
-            manual = st.text_input("Digite o nome da música:")
+            st.markdown("<label>Não encontrou? Digite abaixo:</label>", unsafe_allow_html=True)
+            manual = st.text_input("Manual:")
             if st.form_submit_button("Enviar Pedido Manual"):
                 if manual:
                     requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": manual})
-                    st.markdown('<div class="warning-box">Seu pedido foi enviado, mas nem todas as músicas existem na versão Karaoke.</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="warning-box">Seu pedido foi enviado, mas nem todas as músicas existem na versão Karaoke. 🎵🎶</div>', unsafe_allow_html=True)
 
     with col_cam:
         st.camera_input("Foto")
