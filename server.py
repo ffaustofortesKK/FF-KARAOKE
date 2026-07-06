@@ -19,18 +19,19 @@ st.markdown(f"""
     }}
     .confirma-social {{ color: white !important; text-shadow: 2px 2px 4px #000000; text-decoration: underline; font-weight: bold; }}
     
-    /* Botões Amarelos com letra Preta */
-    div.stButton > button {{ background-color: #FFD700 !important; color: #000000 !important; font-weight: bold !important; }}
-    
-    label {{ color: white !important; font-weight: bold; }}
-    div[data-baseweb="input"], div[data-baseweb="select"] {{ width: 50% !important; }}
-    input {{ color: #000000 !important; font-weight: bold; }}
-    .success-box {{ background-color: #008000; color: #FFFFFF; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 10px; width: 50%; }}
-    .warning-box {{ background-color: #DAA520; color: #000000; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 10px; width: 50%; }}
+    /* Botões Verde (Ação) */
+    div.stButton > button.acao {{ background-color: #28a745 !important; color: white !important; font-weight: bold; }}
+    /* Botões Vermelho (Limpar) */
+    div.stButton > button.limpar {{ background-color: #dc3545 !important; color: white !important; font-weight: bold; }}
     </style>
 """, unsafe_allow_html=True)
 
+# Helper para aplicar estilos aos botões
+def btn_verde(label): return st.button(label, key=f"btn_v_{label}", help="Ação", use_container_width=False, type="primary")
+def btn_vermelho(label): return st.button(label, key=f"btn_r_{label}", help="Limpar")
+
 if 'registado' not in st.session_state: st.session_state.registado = False
+if 'resultados' not in st.session_state: st.session_state.resultados = None
 
 st.markdown(f'<div style="display:flex; justify-content:center;"><img src="{LINK_LOGO}" width="250"></div>', unsafe_allow_html=True)
 
@@ -52,10 +53,10 @@ else:
         st.markdown(f'<p style="color:#FFD700; font-weight:bold; font-size:24px;">Bem-vindo, {st.session_state.nome}!</p>', unsafe_allow_html=True)
         
         # BUSCA
-        with st.form("form_busca", clear_on_submit=True):
-            busca = st.text_input("Título / Cantor:")
-            c1, c2 = st.columns(2)
-            if c1.form_submit_button("Pesquisar"):
+        busca = st.text_input("Título / Cantor:")
+        c1, c2 = st.columns([1, 4])
+        with c1: 
+            if st.button("🔍 Pesquisar", key="pesq"):
                 try:
                     resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
                     dados = resp.json()
@@ -63,31 +64,32 @@ else:
                     st.session_state.resultados = [m for m in cat if busca.lower() in m.lower()]
                     st.rerun()
                 except: pass
-            if c2.form_submit_button("Limpar Pesquisa"):
+        with c2:
+            if st.button("❌ Limpar Pesquisa"):
                 st.session_state.resultados = None
                 st.rerun()
 
-        if 'resultados' in st.session_state and st.session_state.resultados:
+        if st.session_state.resultados:
             escolha = st.selectbox("Selecione a música:", st.session_state.resultados)
-            c1, c2 = st.columns(2)
-            if c1.button("Confirmar Pedido"):
-                requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
-                st.markdown('<div class="success-box">Pedido enviado com sucesso! 🎵</div>', unsafe_allow_html=True)
-                st.session_state.resultados = None
-                st.rerun()
-            if c2.button("Limpar Pedido"):
-                st.session_state.resultados = None
-                st.rerun()
-        
+            c3, c4 = st.columns([1, 4])
+            with c3:
+                if st.button("✅ Confirmar Pedido"):
+                    requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
+                    for _ in range(5): st.toast("🎵") # Efeito de nota subindo
+                    st.session_state.resultados = None
+                    st.rerun()
+            with c4:
+                if st.button("❌ Limpar Pedido"):
+                    st.session_state.resultados = None
+                    st.rerun()
+
         # PEDIDO MANUAL
-        with st.form("form_manual", clear_on_submit=True):
-            manual = st.text_input("Título/Cantor (Manual):")
-            c1, c2 = st.columns(2)
-            if c1.form_submit_button("Enviar Pedido Manual"):
-                if manual:
-                    requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": manual})
-                    st.markdown('<div class="warning-box">Seu pedido foi enviado, mas nem todas as musicas existem na versão Karaoke.</div>', unsafe_allow_html=True)
-            if c2.form_submit_button("Limpar"):
+        st.markdown("<br><label>Título/Cantor não listado:</label>", unsafe_allow_html=True)
+        manual = st.text_input("Digite manualmente:")
+        if st.button("Enviar Pedido Manual"):
+            if manual:
+                requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": manual})
+                st.warning("Seu pedido foi enviado, mas nem todas as músicas existem na versão Karaoke.")
                 st.rerun()
 
     with col_cam:
