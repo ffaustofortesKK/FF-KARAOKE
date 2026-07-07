@@ -23,24 +23,20 @@ st.markdown(f"""
     
     /* Botões: Cinza escuro, letra branca, hover amarelo */
     div.stButton > button {{ 
-        background-color: #333333 !important; 
-        color: #FFFFFF !important; 
-        font-weight: bold; 
-        border: 1px solid #555;
-        transition: 0.3s;
+        background-color: #333333 !important; color: #FFFFFF !important; 
+        font-weight: bold; border: 1px solid #555; transition: 0.3s;
     }}
-    div.stButton > button:hover {{ 
-        background-color: #FFD700 !important; 
-        color: #000000 !important; 
-    }}
-    .success-box {{ background-color: #008000; color: #FFFFFF; padding: 10px; border-radius: 5px; font-weight: bold; width: 40%; }}
-    .warning-box {{ background-color: #DAA520; color: #000000; padding: 10px; border-radius: 5px; font-weight: bold; width: 40%; }}
+    div.stButton > button:hover {{ background-color: #FFD700 !important; color: #000000 !important; }}
+    
+    /* Estilo Lista Á SEGUIR */
+    .box-seguir {{ background: #111; padding: 20px; border: 2px solid #FFD700; border-radius: 10px; margin-top: 20px; }}
+    .item-seguir {{ color: #FFD700; font-weight: bold; font-size: 18px; margin: 5px 0; }}
     </style>
 """, unsafe_allow_html=True)
 
 if 'registado' not in st.session_state: st.session_state.registado = False
 
-# Foto no topo (se registado)
+# Layout Header
 if st.session_state.registado:
     st.markdown(f'<div style="display:flex; justify-content:center;"><img src="{LINK_LOGO}" width="150"></div>', unsafe_allow_html=True)
     st.markdown(f'<p style="text-align:center; color:#FFD700; font-size:20px;">Bem-vindo, {st.session_state.nome}!</p>', unsafe_allow_html=True)
@@ -62,6 +58,16 @@ if not st.session_state.registado:
 else:
     col_main, col_cam = st.columns([2, 1])
     with col_main:
+        # --- Á SEGUIR (Lista de Pedidos) ---
+        st.markdown('<div class="box-seguir"><h2>Á SEGUIR ➔</h2>', unsafe_allow_html=True)
+        try:
+            pedidos_resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5).json()
+            if pedidos_resp:
+                for i, (key, val) in enumerate(pedidos_resp.items(), 1):
+                    st.markdown(f'<p class="item-seguir">{i}. {val.get("musica", "N/A")}</p>', unsafe_allow_html=True)
+        except: st.write("Aguardando pedidos...")
+        st.markdown('</div>', unsafe_allow_html=True)
+
         # BUSCA
         with st.form("form_busca", clear_on_submit=True):
             busca = st.text_input("Título / Cantor:")
