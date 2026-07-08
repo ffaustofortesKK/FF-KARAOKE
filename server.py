@@ -1,36 +1,30 @@
 import streamlit as st
 import requests
 import base64
-from io import BytesIO
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
 URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
 LINK_LOGO = "https://cdn.phototourl.com/free/2026-07-03-793a0f18-6143-44c8-b56e-e44af828c30c.png"
-URL_SOM_PALMAS = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" # Substitua por um link de palmas real se desejar
+# Som de palmas (URL direta para o arquivo de áudio)
+URL_SOM_PALMAS = "https://www.soundjay.com/buttons/sounds/button-10.mp3" 
 
 st.set_page_config(page_title="FF KARAOKE CLOUD", layout="wide")
 
 # CSS personalizado: Fundo com logo e estilo geral
 st.markdown(f"""
-<style>
-.stApp {{ 
-    background: linear-gradient(rgba(9, 10, 15, 0.8), rgba(9, 10, 15, 0.8)), url('{LINK_LOGO}');
-    background-size: contain;
-    background-position: center;
-    background-repeat: no-repeat;
-    color: white; 
-}}
-</style>
+    <style>
+    .stApp {{ 
+        background: linear-gradient(rgba(9, 10, 15, 0.9), rgba(9, 10, 15, 0.9)), url('{LINK_LOGO}');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        color: white;
+    }}
+    </style>
 """, unsafe_allow_html=True)
 
-# Inicialização de estados
 if 'registado' not in st.session_state: st.session_state.registado = False
-if 'reset_key' not in st.session_state: st.session_state.reset_key = 0
-
-def limpar_campos():
-    st.session_state.reset_key += 1
-    st.rerun()
 
 if not st.session_state.registado:
     st.subheader("📝 Registo Inicial")
@@ -43,8 +37,8 @@ if not st.session_state.registado:
 else:
     st.title(f"Bem-vindo, {st.session_state.nome}!")
     
-    # BUSCA com Lupa
-    busca = st.text_input("🔍 Pesquisar Música:", key=f"busca_{st.session_state.reset_key}")
+    # BUSCA COM ÍCONE DE LUPA
+    busca = st.text_input("🔍 Pesquisar Música:")
     
     escolha = None
     if busca:
@@ -53,15 +47,15 @@ else:
             dados = resp.json()
             cat = list(dados.keys()) if isinstance(dados, dict) else dados
             resultados = [m for m in cat if busca.lower() in m.lower()]
-            escolha = st.selectbox("Selecione:", resultados, key=f"sel_{st.session_state.reset_key}")
+            escolha = st.selectbox("Selecione a música:", resultados)
         except: 
-            st.error("Erro ao carregar catálogo.")
+            st.error("Erro ao conectar ao catálogo.")
 
     # --- ENVIO ---
     if escolha:
         st.write(f"Música selecionada: **{escolha}**")
         
-        col1, col2 = st.columns([1, 4])
+        col1, col2 = st.columns([1, 5])
         with col1:
             if st.button("Confirmar Pedido"):
                 payload = {
@@ -71,18 +65,21 @@ else:
                 }
                 requests.post(URL_FIREBASE_PEDIDOS, json=payload)
                 
-                # Efeitos
+                # Efeito sonoro e feedback
                 st.audio(URL_SOM_PALMAS, autoplay=True)
-                st.balloons()
                 st.success("Pedido enviado com sucesso!")
-                st.session_state.reset_key += 1
-                st.rerun()
+                st.balloons()
                 
+                # Limpa os campos através do rerun
+                st.session_state.busca_feita = ""
+                st.rerun()
+
         with col2:
             if st.button("Limpar"):
-                limpar_campos()
+                st.success("Campos limpos!")
+                st.rerun()
 
-    st.markdown("---")
+    st.divider()
     if st.button("Sair"):
         st.session_state.registado = False
         st.rerun()
