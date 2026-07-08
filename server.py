@@ -1,17 +1,19 @@
 import streamlit as st
 import requests
-import base64
-from io import BytesIO
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
 URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
-LINK_LOGO = "https://cdn.phototourl.com/free/2026-07-03-793a0f18-6143-44c8-b56e-e44af828c30c.png"
 
 st.set_page_config(page_title="FF KARAOKE CLOUD", layout="wide")
 
-# CSS personalizado
-st.markdown(f"""<style>.stApp {{ background: #090A0F; color: white; }}</style>""", unsafe_allow_html=True)
+# CSS para a Lupa e estilo geral
+st.markdown("""
+    <style>
+    .stApp { background: #090A0F; color: white; }
+    .search-icon { font-size: 24px; margin-right: 10px; }
+    </style>
+""", unsafe_allow_html=True)
 
 if 'registado' not in st.session_state: st.session_state.registado = False
 
@@ -24,48 +26,45 @@ if not st.session_state.registado:
             st.session_state.registado = True
             st.rerun()
 else:
-    # --- LAYOUT: CAMARA NO TOPO ESQUERDO ---
-    col_cam, col_main = st.columns([1, 2])
+    st.title(f"Bem-vindo, {st.session_state.nome}!")
     
-    with col_cam:
-        st.subheader("📸 Sua Foto")
-        foto_capturada = st.camera_input("Tirar foto para o pedido")
-        if foto_capturada:
-            # Converte a foto para base64 para enviar via JSON
-            bytes_data = foto_capturada.getvalue()
-            st.session_state.foto_b64 = base64.b64encode(bytes_data).decode()
-        else:
-            st.session_state.foto_b64 = None
-
-    with col_main:
-        st.title(f"Bem-vindo, {st.session_state.nome}!")
-        
-        # BUSCA
-        busca = st.text_input("Pesquisar Música:")
-        if busca:
-            try:
-                resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
-                dados = resp.json()
-                cat = list(dados.keys()) if isinstance(dados, dict) else dados
-                resultados = [m for m in cat if busca.lower() in m.lower()]
+    # BUSCA COM LUPA
+    st.markdown("### <span class='search-icon'>🔍</span> Pesquisar Música", unsafe_allow_html=True)
+    busca = st.text_input("", placeholder="Digite o nome da música...")
+    
+    escolha = None
+    if busca:
+        try:
+            resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
+            dados = resp.json()
+            cat = list(dados.keys()) if isinstance(dados, dict) else dados
+            resultados = [m for m in cat if busca.lower() in m.lower()]
+            if resultados:
                 escolha = st.selectbox("Selecione:", resultados)
-            except: escolha = None
-        else: escolha = None
+        except: 
+            st.error("Erro ao conectar ao catálogo.")
 
-        # --- ENVIO COM OPÇÃO DE FOTO ---
-        if escolha:
-            st.write(f"Música selecionada: **{escolha}**")
-            enviar_com_foto = st.radio("Deseja enviar seu pedido com esta foto?", ["Não", "Sim"])
+    # --- ENVIO ---
+    if escolha:
+        st.write(f"Música selecionada: **{escolha}**")
+        
+        if st.button("Confirmar Pedido"):
+            payload = {
+                "cantor": st.session_state.nome, 
+                "musica": escolha,
+                "foto": None # Foto removida conforme solicitado
+            }
+            requests.post(URL_FIREBASE_PEDIDOS, json=payload)
             
-            if st.button("Confirmar Pedido"):
-                payload = {
-                    "cantor": st.session_state.nome, 
-                    "musica": escolha,
-                    "foto": st.session_state.foto_b64 if (enviar_com_foto == "Sim" and st.session_state.foto_b64) else None
-                }
-                requests.post(URL_FIREBASE_PEDIDOS, json=payload)
-                st.success("Pedido enviado com sucesso!")
-                st.balloons()
+            # Efeito de Palmas
+            st.success("Pedido enviado com sucesso!")
+            st.balloons()
+            
+            # Tocar som de palmas (Certifique-se de ter um arquivo 'palmas.mp3' na pasta)
+            try:
+                st.audio("https://www.myinstants.com/media/sounds/applause.mp3", format="audio/mp3", autoplay=True)
+            except:
+                pass
 
     if st.button("Sair"):
         st.session_state.registado = False
