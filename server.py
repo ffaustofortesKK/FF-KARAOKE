@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import time # Importado para pausar antes do rerun
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
@@ -51,23 +52,22 @@ else:
     # --- ENVIO CATALOGO ---
     if escolha:
         st.write(f"Música selecionada: **{escolha}**")
-        col1, col2 = st.columns([1, 10])
-        with col1:
-            if st.button("Confirmar Pedido"):
-                requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
-                st.audio(URL_SOM_PALMAS, autoplay=True)
-                st.success("Pedido enviado com sucesso!")
-                st.balloons()
-                st.rerun()
-        with col2:
-            if st.button("Limpar"):
-                st.rerun()
+        if st.button("Confirmar Pedido"):
+            requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
+            
+            # EFEITOS E MENSAGENS
+            st.balloons()
+            st.success("O seu pedido foi enviado com sucesso!")
+            st.audio(URL_SOM_PALMAS, autoplay=True)
+            
+            time.sleep(2) # Pausa para o utilizador ler a mensagem
+            st.rerun()
 
     st.divider()
 
     # 2. CAMPO PEDIDO MANUAL
     st.subheader("Manual")
-    pedido_manual = st.text_input("Não achou? Pesquise aqui o nome da música:")
+    pedido_manual = st.text_input("Não achou? Digite o nome da música:")
     
     if st.button("Confirmar Pedido Manual"):
         if pedido_manual:
@@ -77,9 +77,14 @@ else:
                 "status": "manual"
             }
             requests.post(URL_FIREBASE_PEDIDOS, json=payload)
-            # Mensagem de alerta solicitada
-            st.warning("O seu pedido foi enviado, mas nem todas as músicas existem em Karaoke.")
+            
+            # EFEITOS E MENSAGENS
             st.balloons()
+            st.success("O seu pedido foi enviado com sucesso!")
+            st.warning("Nota: O seu pedido foi enviado, mas nem todas as músicas existem em Karaoke.")
+            
+            time.sleep(3) # Pausa maior devido ao aviso
+            st.rerun()
         else:
             st.error("Por favor, digite o nome da música.")
 
