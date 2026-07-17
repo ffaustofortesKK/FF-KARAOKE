@@ -23,6 +23,22 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
+# Função para carregar o catálogo de forma estável
+@st.cache_data(ttl=60)
+def carregar_catalogo():
+    try:
+        resp = requests.get(URL_FIREBASE_CATALOGO, timeout=10)
+        dados = resp.json()
+        if isinstance(dados, dict):
+            # Se encontrar a chave "catalogo", extrai os valores
+            if "catalogo" in dados:
+                return list(dados["catalogo"].values())
+            # Se não, tenta extrair os valores diretamente
+            return list(dados.values())
+        return []
+    except:
+        return []
+
 if 'registado' not in st.session_state: st.session_state.registado = False
 
 if not st.session_state.registado:
@@ -36,33 +52,28 @@ if not st.session_state.registado:
 else:
     st.title(f"Bem-vindo, {st.session_state.nome}!")
     
+    # Carregar catálogo uma vez
+    catalogo_completo = carregar_catalogo()
+    
     # 1. BUSCA PRINCIPAL
     busca = st.text_input("🔍 Pesquisar Música no catálogo:")
     
     escolha = None
-    if busca:
-        try:
-            resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
-            dados = resp.json()
-            # CORREÇÃO AQUI: Acede à chave "catalogo" e extrai os valores (nomes das músicas)
-            cat = list(dados.get("catalogo", {}).values()) if isinstance(dados, dict) else []
-            resultados = [m for m in cat if busca.lower() in m.lower()]
+    if busca and catalogo_completo:
+        resultados = [m for m in catalogo_completo if busca.lower() in str(m).lower()]
+        if resultados:
             escolha = st.selectbox("Selecione:", resultados)
-        except: 
-            escolha = None
-            st.error("Erro ao carregar catálogo. Tente novamente.")
+        else:
+            st.write("Nenhuma música encontrada com esse termo.")
 
     # --- ENVIO CATALOGO ---
     if escolha:
         st.write(f"Música selecionada: **{escolha}**")
         if st.button("Confirmar Pedido"):
             requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
-            
-            # EFEITOS E MENSAGENS
             st.balloons()
             st.success("O seu pedido foi enviado com sucesso!")
             st.audio(URL_SOM_PALMAS, autoplay=True)
-            
             time.sleep(2) 
             st.rerun()
 
@@ -74,17 +85,11 @@ else:
     
     if st.button("Confirmar Pedido Manual"):
         if pedido_manual:
-            payload = {
-                "cantor": st.session_state.nome, 
-                "musica": pedido_manual,
-                "status": "manual"
-            }
+            payload = {"cantor": st.session_state.nome, "musica": pedido_manual, "status": "manual"}
             requests.post(URL_FIREBASE_PEDIDOS, json=payload)
-            
             st.balloons()
             st.success("O seu pedido foi enviado com sucesso!")
             st.warning("Nota: O seu pedido foi enviado, mas nem todas as músicas existem em Karaoke.")
-            
             time.sleep(3) 
             st.rerun()
         else:
