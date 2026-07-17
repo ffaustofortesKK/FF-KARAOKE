@@ -46,16 +46,22 @@ else:
             dados = resp.json()
             
             # --- FUNÇÃO DE PESQUISA CORRIGIDA ---
-            # Acede à chave "catalogo" e extrai apenas os nomes das músicas (valores)
-            if isinstance(dados, dict) and "catalogo" in dados:
-                cat = list(dados["catalogo"].values())
+            # Navega na estrutura: verifica se existe "catalogo" e extrai os valores
+            if isinstance(dados, dict):
+                if "catalogo" in dados:
+                    cat = list(dados["catalogo"].values())
+                else:
+                    cat = list(dados.values())
             else:
                 cat = []
             
-            resultados = [m for m in cat if busca.lower() in m.lower()]
+            resultados = [m for m in cat if busca.lower() in str(m).lower()]
             # ------------------------------------
             
-            escolha = st.selectbox("Selecione:", resultados)
+            if resultados:
+                escolha = st.selectbox("Selecione:", resultados)
+            else:
+                st.write("Nenhuma música encontrada.")
         except: 
             escolha = None
             st.error("Erro ao carregar catálogo.")
@@ -87,7 +93,7 @@ else:
                 "musica": pedido_manual,
                 "status": "manual"
             }
-            requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": pedido_manual, "status": "manual"})
+            requests.post(URL_FIREBASE_PEDIDOS, json=payload)
 
             # EFEITOS E MENSAGENS
             st.balloons()
