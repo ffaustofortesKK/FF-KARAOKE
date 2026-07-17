@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-import time # Importado para pausar antes do rerun
+import time 
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
@@ -44,10 +44,13 @@ else:
         try:
             resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
             dados = resp.json()
-            cat = list(dados.keys()) if isinstance(dados, dict) else dados
+            # CORREÇÃO AQUI: Acede à chave "catalogo" e extrai os valores (nomes das músicas)
+            cat = list(dados.get("catalogo", {}).values()) if isinstance(dados, dict) else []
             resultados = [m for m in cat if busca.lower() in m.lower()]
             escolha = st.selectbox("Selecione:", resultados)
-        except: escolha = None
+        except: 
+            escolha = None
+            st.error("Erro ao carregar catálogo. Tente novamente.")
 
     # --- ENVIO CATALOGO ---
     if escolha:
@@ -60,7 +63,7 @@ else:
             st.success("O seu pedido foi enviado com sucesso!")
             st.audio(URL_SOM_PALMAS, autoplay=True)
             
-            time.sleep(2) # Pausa para o utilizador ler a mensagem
+            time.sleep(2) 
             st.rerun()
 
     st.divider()
@@ -78,12 +81,11 @@ else:
             }
             requests.post(URL_FIREBASE_PEDIDOS, json=payload)
             
-            # EFEITOS E MENSAGENS
             st.balloons()
             st.success("O seu pedido foi enviado com sucesso!")
             st.warning("Nota: O seu pedido foi enviado, mas nem todas as músicas existem em Karaoke.")
             
-            time.sleep(3) # Pausa maior devido ao aviso
+            time.sleep(3) 
             st.rerun()
         else:
             st.error("Por favor, digite o nome da música.")
