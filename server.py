@@ -1,100 +1,92 @@
 import streamlit as st
 import requests
-import time 
+import time
 
-# --- CONFIGURAÇÕES ---
-URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
-URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
-LINK_LOGO = "https://cdn.phototourl.com/free/2026-07-03-793a0f18-6143-44c8-b56e-e44af828c30c.png"
-URL_SOM_PALMAS = "https://www.soundjay.com/misc/sounds/applause-2.mp3"
-
-st.set_page_config(page_title="FF KARAOKE CLOUD", layout="wide")
-
-# CSS personalizado
-st.markdown(f"""
-    <style>
-    .stApp {{ 
-        background: linear-gradient(rgba(9, 10, 15, 0.85), rgba(9, 10, 15, 0.85)), url('{LINK_LOGO}');
-        background-size: contain;
-        background-repeat: no-repeat;
-        background-position: center;
-        color: white; 
-    }}
-    </style>
-""", unsafe_allow_html=True)
-
-# Função para carregar o catálogo de forma estável
-@st.cache_data(ttl=60)
-def carregar_catalogo():
-    try:
-        resp = requests.get(URL_FIREBASE_CATALOGO, timeout=10)
-        dados = resp.json()
-        if isinstance(dados, dict):
-            # Se encontrar a chave "catalogo", extrai os valores
-            if "catalogo" in dados:
-                return list(dados["catalogo"].values())
-            # Se não, tenta extrair os valores diretamente
-            return list(dados.values())
-        return []
-    except:
-        return []
+st.set_page_config(page_title="FF KARAOKE - CLIENTE", layout="centered")
 
 if 'registado' not in st.session_state: st.session_state.registado = False
+if 'minha_playlist' not in st.session_state: st.session_state.minha_playlist = []
+
+query_params = st.query_params
+prestador_slug = query_params.get("prestador", "geral")
+URL_STATUS = f"https://grupoffkaraoke-default-rtdb.firebaseio.com/status_{prestador_slug}.json"
+URL_PEDIDOS = f"https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos_{prestador_slug}.json"
+URL_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
+
+@st.cache_data(ttl=300)
+def obter_catalogo():
+    try:
+        res = requests.get(URL_CATALOGO).json()
+        # CORREÇÃO: Verifica se a chave "catalogo" existe e extrai os seus valores
+        if isinstance(res, dict):
+            if "catalogo" in res:
+                return list(res["catalogo"].values())
+            return list(res.values())
+        return []
+    except: 
+        return []
 
 if not st.session_state.registado:
-    st.subheader("📝 Registo Inicial")
-    nome = st.text_input("Nome:")
-    if st.button("Concluir Registo"):
-        if nome:
-            st.session_state.nome = nome
-            st.session_state.registado = True
-            st.rerun()
+    st.title("🎤 FF Karaoke")
+    nome = st.text_input("Como quer ser chamado?")
+    if st.button("Entrar"):
+        if nome: st.session_state.nome = nome; st.session_state.registado = True; st.rerun()
 else:
-    st.title(f"Bem-vindo, {st.session_state.nome}!")
-    
-    # Carregar catálogo uma vez
-    catalogo_completo = carregar_catalogo()
-    
-    # 1. BUSCA PRINCIPAL
-    busca = st.text_input("🔍 Pesquisar Música no catálogo:")
-    
-    escolha = None
-    if busca and catalogo_completo:
-        resultados = [m for m in catalogo_completo if busca.lower() in str(m).lower()]
-        if resultados:
-            escolha = st.selectbox("Selecione:", resultados)
-        else:
-            st.write("Nenhuma música encontrada com esse termo.")
+    try:
+        status = requests.get(f"{URL_STATUS}?nocache={time.time()}").json() or {}
+    except: status = {}
 
-    # --- ENVIO CATALOGO ---
-    if escolha:
-        st.write(f"Música selecionada: **{escolha}**")
-        if st.button("Confirmar Pedido"):
-            requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
-            st.balloons()
-            st.success("O seu pedido foi enviado com sucesso!")
-            st.audio(URL_SOM_PALMAS, autoplay=True)
-            time.sleep(2) 
+    nome_firebase = str(status.get("cantor", "")).strip().lower()
+    meu_nome = str(st.session_state.nome).strip().lower()
+
+    if nome_firebase == meu_nome and status.get("comando") == "aguardando_play":
+        st.success("🎉 É a sua vez de brilhar!")
+        if st.button("▶️ COMEÇAR A MINHA MÚSICA", use_container_width=True):
+            requests.patch(URL_STATUS, json={"comando": "play"})
             st.rerun()
+    elif nome_firebase == meu_nome and status.get("comando") == "play":
+        st.info("🎤 A sua música está a tocar na TV!")
+    else:
+        st.info("Aguarde a sua vez e prepare a sua playlist!")
+        
+        # 1. PLAYLIST ATUAL
+        st.subheader("Minha Playlist (Máx 5)")
+        for i, m in enumerate(st.session_state.minha_playlist):
+            col1, col2 = st.columns([4, 1])
+            col1.write(f"{i+1}. {m}")
+            if col2.button("❌", key=f"rem_{i}"):
+                st.session_state.minha_playlist.pop(i); st.rerun()
+        
+        # 2. PESQUISA (Se houver espaço)
+        if len(st.session_state.minha_playlist) < 5:
+            termo = st.text_input("🔍 Pesquisar música no catálogo:")
+            cat_data = obter_catalogo()
+            resultados = [m for m in cat_data if termo.lower() in str(m).lower()] if termo else []
+            
+            if termo and resultados:
+                musica_sel = st.selectbox("Escolha:", resultados)
+                if st.button("➕ Adicionar à Playlist"):
+                    st.session_state.minha_playlist.append(musica_sel); st.rerun()
+            elif termo and not resultados:
+                st.write("Nenhuma música encontrada.")
+        
+        # 3. PEDIDO MANUAL
+        st.divider()
+        st.subheader("📝 Pedido Personalizado")
+        pedido_extra = st.text_area("Não encontrou? Escreva o nome da música:")
+        
+        if st.button("🚀 Enviar Pedidos para o DJ", use_container_width=True):
+            if not st.session_state.minha_playlist and not pedido_extra:
+                st.warning("Adicione músicas à playlist ou escreva um pedido.")
+            else:
+                for m in st.session_state.minha_playlist:
+                    requests.post(URL_PEDIDOS, json={"cantor": st.session_state.nome, "musica": m})
+                if pedido_extra:
+                    requests.post(URL_PEDIDOS, json={"cantor": st.session_state.nome, "musica": f"PEDIDO: {pedido_extra}"})
+                
+                st.session_state.minha_playlist = []
+                st.warning("⚠️ O seu pedido foi enviado. Aguarde a sua vez.")
+                time.sleep(3); st.rerun()
 
     st.divider()
-
-    # 2. CAMPO PEDIDO MANUAL
-    st.subheader("Manual")
-    pedido_manual = st.text_input("Não achou? Digite o nome da música:")
-    
-    if st.button("Confirmar Pedido Manual"):
-        if pedido_manual:
-            payload = {"cantor": st.session_state.nome, "musica": pedido_manual, "status": "manual"}
-            requests.post(URL_FIREBASE_PEDIDOS, json=payload)
-            st.balloons()
-            st.success("O seu pedido foi enviado com sucesso!")
-            st.warning("Nota: O seu pedido foi enviado, mas nem todas as músicas existem em Karaoke.")
-            time.sleep(3) 
-            st.rerun()
-        else:
-            st.error("Por favor, digite o nome da música.")
-
-    if st.button("Sair"):
-        st.session_state.registado = False
-        st.rerun()
+    if st.button("Sair"): st.session_state.registado = False; st.rerun()
