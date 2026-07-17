@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-import time # Importado para pausar antes do rerun
+import time
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
@@ -9,6 +9,21 @@ LINK_LOGO = "https://cdn.phototourl.com/free/2026-07-03-793a0f18-6143-44c8-b56e-
 URL_SOM_PALMAS = "https://www.soundjay.com/misc/sounds/applause-2.mp3"
 
 st.set_page_config(page_title="FF KARAOKE CLOUD", layout="wide")
+
+# Função para localizar e carregar o catálogo
+@st.cache_data(ttl=300)
+def obter_catalogo():
+    try:
+        res = requests.get(URL_FIREBASE_CATALOGO, timeout=5).json()
+        if isinstance(res, dict):
+            # Se houver a chave "catalogo", extrai os valores
+            if "catalogo" in res:
+                return list(res["catalogo"].values())
+            # Caso contrário, tenta extrair os valores da raiz
+            return list(res.values())
+        return []
+    except: 
+        return []
 
 # CSS personalizado
 st.markdown(f"""
@@ -41,43 +56,23 @@ else:
 
     escolha = None
     if busca:
-        try:
-            resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
-            dados = resp.json()
-            
-            # --- FUNÇÃO DE PESQUISA CORRIGIDA ---
-            # Navega na estrutura: verifica se existe "catalogo" e extrai os valores
-            if isinstance(dados, dict):
-                if "catalogo" in dados:
-                    cat = list(dados["catalogo"].values())
-                else:
-                    cat = list(dados.values())
-            else:
-                cat = []
-            
-            resultados = [m for m in cat if busca.lower() in str(m).lower()]
-            # ------------------------------------
-            
-            if resultados:
-                escolha = st.selectbox("Selecione:", resultados)
-            else:
-                st.write("Nenhuma música encontrada.")
-        except: 
-            escolha = None
-            st.error("Erro ao carregar catálogo.")
+        cat = obter_catalogo() # Chama a função de localização
+        resultados = [m for m in cat if busca.lower() in str(m).lower()]
+        
+        if resultados:
+            escolha = st.selectbox("Selecione:", resultados)
+        else:
+            st.write("Nenhuma música encontrada.")
 
     # --- ENVIO CATALOGO ---
     if escolha:
         st.write(f"Música selecionada: **{escolha}**")
         if st.button("Confirmar Pedido"):
             requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
-
-            # EFEITOS E MENSAGENS
             st.balloons()
             st.success("O seu pedido foi enviado com sucesso!")
             st.audio(URL_SOM_PALMAS, autoplay=True)
-
-            time.sleep(2) # Pausa para o utilizador ler a mensagem
+            time.sleep(2)
             st.rerun()
 
     st.divider()
@@ -94,13 +89,10 @@ else:
                 "status": "manual"
             }
             requests.post(URL_FIREBASE_PEDIDOS, json=payload)
-
-            # EFEITOS E MENSAGENS
             st.balloons()
             st.success("O seu pedido foi enviado com sucesso!")
             st.warning("Nota: O seu pedido foi enviado, mas nem todas as músicas existem em Karaoke.")
-
-            time.sleep(3) # Pausa maior devido ao aviso
+            time.sleep(3)
             st.rerun()
         else:
             st.error("Por favor, digite o nome da música.")
