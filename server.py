@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-import time
+import time 
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
@@ -10,19 +10,20 @@ URL_SOM_PALMAS = "https://www.soundjay.com/misc/sounds/applause-2.mp3"
 
 st.set_page_config(page_title="FF KARAOKE CLOUD", layout="wide")
 
-# Função para localizar e carregar o catálogo
+# Função para localizar e carregar o catálogo corretamente
 @st.cache_data(ttl=300)
 def obter_catalogo():
     try:
-        res = requests.get(URL_FIREBASE_CATALOGO, timeout=5).json()
-        if isinstance(res, dict):
-            # Se houver a chave "catalogo", extrai os valores
-            if "catalogo" in res:
-                return list(res["catalogo"].values())
-            # Caso contrário, tenta extrair os valores da raiz
-            return list(res.values())
+        resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
+        dados = resp.json()
+        # Se for uma lista direta (como mostrado na sua imagem), retorna ela mesma
+        if isinstance(dados, list):
+            return dados
+        # Se por algum motivo for um dicionário, extrai os valores
+        if isinstance(dados, dict):
+            return list(dados.values())
         return []
-    except: 
+    except:
         return []
 
 # CSS personalizado
@@ -56,7 +57,7 @@ else:
 
     escolha = None
     if busca:
-        cat = obter_catalogo() # Chama a função de localização
+        cat = obter_catalogo() # Chama a função que criámos acima
         resultados = [m for m in cat if busca.lower() in str(m).lower()]
         
         if resultados:
