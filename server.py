@@ -10,23 +10,19 @@ URL_SOM_PALMAS = "https://www.soundjay.com/misc/sounds/applause-2.mp3"
 
 st.set_page_config(page_title="FF KARAOKE CLOUD", layout="wide")
 
-# Função para localizar e carregar o catálogo corretamente
 @st.cache_data(ttl=300)
 def obter_catalogo():
     try:
         resp = requests.get(URL_FIREBASE_CATALOGO, timeout=5)
         dados = resp.json()
-        # Se for uma lista direta (como mostrado na sua imagem), retorna ela mesma
         if isinstance(dados, list):
             return dados
-        # Se por algum motivo for um dicionário, extrai os valores
         if isinstance(dados, dict):
             return list(dados.values())
         return []
     except:
         return []
 
-# CSS personalizado
 st.markdown(f"""
     <style>
     .stApp {{ 
@@ -52,24 +48,22 @@ if not st.session_state.registado:
 else:
     st.title(f"Bem-vindo, {st.session_state.nome}!")
 
-    # 1. BUSCA PRINCIPAL
     busca = st.text_input("🔍 Pesquisar Música no catálogo:")
 
     escolha = None
     if busca:
-        cat = obter_catalogo() # Chama a função que criámos acima
+        cat = obter_catalogo()
         resultados = [m for m in cat if busca.lower() in str(m).lower()]
         
         if resultados:
             escolha = st.selectbox("Selecione:", resultados)
-        else:
-            st.write("Nenhuma música encontrada.")
 
     # --- ENVIO CATALOGO ---
     if escolha:
         st.write(f"Música selecionada: **{escolha}**")
         if st.button("Confirmar Pedido"):
-            requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": escolha})
+            # Enviamos o valor puro da variável 'escolha'
+            requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": str(escolha).strip()})
             st.balloons()
             st.success("O seu pedido foi enviado com sucesso!")
             st.audio(URL_SOM_PALMAS, autoplay=True)
@@ -83,10 +77,10 @@ else:
     pedido_manual = st.text_input("Não achou? Digite o nome da música:")
 
     if st.button("Confirmar Pedido Manual"):
-        if pedido_manual:
+        if pedido_manual and pedido_manual.strip():
             payload = {
                 "cantor": st.session_state.nome, 
-                "musica": pedido_manual,
+                "musica": pedido_manual.strip(), # Garantimos que apenas o texto digitado seja enviado
                 "status": "manual"
             }
             requests.post(URL_FIREBASE_PEDIDOS, json=payload)
