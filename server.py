@@ -77,7 +77,7 @@ st.markdown(f"""
         margin-bottom: 20px;
     }}
 
-    /* Microfone 50% maior (100px * 1.5 = 150px) e com rotação contínua 360° */
+    /* Microfone 50% maior e com rotação contínua 360° */
     .icone-mic {{
         font-size: 150px;
         animation: girarRelogio 4s linear infinite;
@@ -101,6 +101,46 @@ st.markdown(f"""
         font-weight: bold;
         font-size: 28px;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    }}
+
+    /* Texto em rodapé (marquee/animação contínua) com cor branca e sombra */
+    .marquee-rodape {{
+        width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        box-sizing: border-box;
+        margin-top: 30px;
+        margin-bottom: 20px;
+    }}
+
+    .marquee-rodape span {{
+        display: inline-block;
+        padding-left: 100%;
+        animation: marquee 15s linear infinite;
+        color: #FFFFFF;
+        font-size: 16px;
+        font-weight: bold;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    }}
+
+    @keyframes marquee {{
+        0%   {{ transform: translate(0, 0); }}
+        100% {{ transform: translate(-100%, 0); }}
+    }}
+
+    /* Estilização personalizada para todos os botões do Streamlit (Azul com texto branco e sombra) */
+    .stButton > button {{
+        background-color: #007BFF !important;
+        color: #FFFFFF !important;
+        font-weight: bold !important;
+        border: none !important;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8) !important;
+        transition: background-color 0.3s ease;
+    }}
+
+    .stButton > button:hover {{
+        background-color: #0056b3 !important;
+        color: #FFFFFF !important;
     }}
     </style>
 """, unsafe_allow_html=True)
@@ -136,7 +176,12 @@ else:
             </div>
         """, unsafe_allow_html=True)
 
-        st.info("À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.")
+        # Texto em rodapé dinâmico (marquee) com cor branca e sombra
+        st.markdown("""
+            <div class="marquee-rodape">
+                <span>À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.</span>
+            </div>
+        """, unsafe_allow_html=True)
         
         # Botão para atualizar a página e verificar a nova posição
         if st.button("🔄 Atualizar Minha Posição"):
