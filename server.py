@@ -23,6 +23,28 @@ def obter_catalogo():
     except:
         return []
 
+def verificar_pedido_ativo(nome_cantor):
+    """Verifica se o cantor já possui um pedido pendente na base de dados."""
+    try:
+        resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
+        dados = resp.json()
+        if not dados:
+            return False
+        
+        # O Firebase retorna um dicionário com IDs únicos como chaves
+        if isinstance(dados, dict):
+            for pedido_id, info in dados.items():
+                if isinstance(info, dict) and info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
+                    # Se o pedido ainda está ativo (podes ajustar a regra de status se necessário)
+                    return True
+        elif isinstance(dados, list):
+            for info in dados:
+                if isinstance(info, dict) and info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
+                    return True
+        return False
+    except:
+        return False
+
 st.markdown(f"""
     <style>
     .stApp {{ 
@@ -48,50 +70,61 @@ if not st.session_state.registado:
 else:
     st.title(f"Bem-vindo, {st.session_state.nome}!")
 
-    busca = st.text_input("🔍 Pesquisar Música no catálogo:")
+    # Verificar se o utilizador já tem um pedido na fila
+    tem_pedido_ativo = verificar_pedido_ativo(st.session_state.nome)
 
-    escolha = None
-    if busca:
-        cat = obter_catalogo()
-        resultados = [m for m in cat if busca.lower() in str(m).lower()]
+    if tem_pedido_ativo:
+        st.warning("⚠️ Você já tem uma música na fila! Só poderá enviar um novo pedido assim que a sua música atual for finalizada.")
         
-        if resultados:
-            escolha = st.selectbox("Selecione:", resultados)
-
-    # --- ENVIO CATALOGO ---
-    if escolha:
-        st.write(f"Música selecionada: **{escolha}**")
-        if st.button("Confirmar Pedido"):
-            # Enviamos o valor puro da variável 'escolha'
-            requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": str(escolha).strip()})
-            st.balloons()
-            st.success("O seu pedido foi enviado com sucesso!")
-            st.audio(URL_SOM_PALMAS, autoplay=True)
-            time.sleep(2)
+        # Botão para atualizar a página e verificar se já foi atendido
+        if st.button("🔄 Atualizar Status"):
             st.rerun()
+    else:
+        # --- 1. PESQUISA NO CATÁLOGO ---
+        busca = st.text_input("🔍 Pesquisar Música no catálogo:")
+
+        escolha = None
+        if busca:
+            cat = obter_catalogo()
+            resultados = [m for m in cat if busca.lower() in str(m).lower()]
+            
+            if resultados:
+                escolha = st.selectbox("Selecione:", resultados)
+
+        # --- ENVIO CATALOGO ---
+        if escolha:
+            st.write(f"Música selecionada: **{escolha}**")
+            if st.button("Confirmar Pedido"):
+                requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": str(escolha).strip()})
+                st.balloons()
+                st.success("O seu pedido foi enviado com sucesso!")
+                st.audio(URL_SOM_PALMAS, autoplay=True)
+                time.sleep(2)
+                st.rerun()
+
+        st.divider()
+
+        # --- 2. CAMPO PEDIDO MANUAL ---
+        st.subheader("Manual")
+        pedido_manual = st.text_input("Não achou? Digite o nome da música:")
+
+        if st.button("Confirmar Pedido Manual"):
+            if pedido_manual and pedido_manual.strip():
+                payload = {
+                    "cantor": st.session_state.nome, 
+                    "musica": pedido_manual.strip(), 
+                    "status": "manual"
+                }
+                requests.post(URL_FIREBASE_PEDIDOS, json=payload)
+                st.balloons()
+                st.success("O seu pedido foi enviado com sucesso!")
+                st.warning("Nota: O seu pedido foi enviado, mas nem todas as músicas existem em Karaoke.")
+                time.sleep(3)
+                st.rerun()
+            else:
+                st.error("Por favor, digite o nome da música.")
 
     st.divider()
-
-    # 2. CAMPO PEDIDO MANUAL
-    st.subheader("Manual")
-    pedido_manual = st.text_input("Não achou? Digite o nome da música:")
-
-    if st.button("Confirmar Pedido Manual"):
-        if pedido_manual and pedido_manual.strip():
-            payload = {
-                "cantor": st.session_state.nome, 
-                "musica": pedido_manual.strip(), # Garantimos que apenas o texto digitado seja enviado
-                "status": "manual"
-            }
-            requests.post(URL_FIREBASE_PEDIDOS, json=payload)
-            st.balloons()
-            st.success("O seu pedido foi enviado com sucesso!")
-            st.warning("Nota: O seu pedido foi enviado, mas nem todas as músicas existem em Karaoke.")
-            time.sleep(3)
-            st.rerun()
-        else:
-            st.error("Por favor, digite o nome da música.")
-
     if st.button("Sair"):
         st.session_state.registado = False
         st.rerun()
