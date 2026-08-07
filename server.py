@@ -66,6 +66,15 @@ st.markdown(f"""
         100% {{ transform: rotate(360deg); }}
     }}
 
+    /* Animação cómica e divertida para o nome (efeito a saltitantes / balanço) */
+    @keyframes comicoMover {{
+        0% {{ transform: translateY(0px) rotate(0deg); }}
+        25% {{ transform: translateY(-8px) rotate(-3deg); }}
+        50% {{ transform: translateY(0px) rotate(0deg); }}
+        75% {{ transform: translateY(-8px) rotate(3deg); }}
+        100% {{ transform: translateY(0px) rotate(0deg); }}
+    }}
+
     .container-mic {{
         display: flex;
         flex-direction: column;
@@ -76,7 +85,7 @@ st.markdown(f"""
     }}
 
     .icone-mic {{
-        font-size: 216px; /* Aumentado 20% do anterior (180px * 1.2) */
+        font-size: 216px; 
         animation: girarRelogio 4s linear infinite;
         text-shadow: 0px 0px 25px rgba(255, 215, 0, 0.8);
         display: inline-block;
@@ -98,11 +107,13 @@ st.markdown(f"""
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
     }}
 
-    /* Nome: Aumentado 40% adicional (em relação ao anterior), verde, com efeito reflexo */
-    .nome-reflexo {{
+    /* Estilo cómico, saltitante, verde, com reflexo e emoji integrado */
+    .nome-comico {{
         font-size: 4.5rem; 
         font-weight: bold;
         color: #28a745;
+        display: inline-block;
+        animation: comicoMover 1.5s ease-in-out infinite;
         text-shadow: 0px 2px 0px rgba(40, 167, 69, 0.4), 
                      0px 4px 0px rgba(40, 167, 69, 0.2), 
                      0px 12px 15px rgba(0, 0, 0, 0.9);
@@ -154,10 +165,14 @@ if not st.session_state.registado:
             st.session_state.registado = True
             st.rerun()
 else:
+    # Adicionando um emoji de microfone/cantor de forma divertida no meio/fim do nome
+    nome_usuario = st.session_state.nome
+    nome_com_emoji = f"🎙️ {nome_usuario} 🎶"
+
     st.markdown(f"""
         <div>
             <h2>Bem-vindo,</h2>
-            <div class="nome-reflexo">{st.session_state.nome}!</div>
+            <div class="nome-comico">{nome_com_emoji}</div>
         </div>
     """, unsafe_allow_html=True)
 
