@@ -23,27 +23,34 @@ def obter_catalogo():
     except:
         return []
 
-def verificar_pedido_ativo(nome_cantor):
-    """Verifica se o cantor já possui um pedido pendente na base de dados."""
+def obter_dados_fila(nome_cantor):
+    """Verifica se o cantor tem pedido ativo e calcula a sua posição exata na fila."""
     try:
         resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
         dados = resp.json()
         if not dados:
-            return False
+            return False, 0
         
-        # O Firebase retorna um dicionário com IDs únicos como chaves
+        lista_pedidos = []
         if isinstance(dados, dict):
             for pedido_id, info in dados.items():
-                if isinstance(info, dict) and info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
-                    # Se o pedido ainda está ativo (podes ajustar a regra de status se necessário)
-                    return True
+                if isinstance(info, dict):
+                    lista_pedidos.append(info)
         elif isinstance(dados, list):
-            for info in dados:
-                if isinstance(info, dict) and info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
-                    return True
-        return False
+            lista_pedidos = [i for i in dados if isinstance(i, dict)]
+
+        # Encontrar a posição (índice + 1) do utilizador na lista de pedidos
+        posicao = 0
+        encontrou = False
+        for idx, info in enumerate(lista_pedidos):
+            if info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
+                encontrou = True
+                posicao = idx + 1
+                break
+                
+        return encontrou, posicao
     except:
-        return False
+        return False, 0
 
 st.markdown(f"""
     <style>
@@ -53,6 +60,29 @@ st.markdown(f"""
         background-repeat: no-repeat;
         background-position: center;
         color: white; 
+    }}
+
+    /* Estilo e Animação do Microfone a Girar */
+    @keyframes girarMicrofone {{
+        0% {{ transform: rotate(0deg); }}
+        25% {{ transform: rotate(10deg); }}
+        75% {{ transform: rotate(-10deg); }}
+        100% {{ transform: rotate(0deg); }}
+    }}
+
+    .container-mic {{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin-top: 30px;
+        margin-bottom: 30px;
+    }}
+
+    .icone-mic {{
+        font-size: 100px;
+        animation: girarMicrofone 3s infinite ease-in-out;
+        text-shadow: 0px 0px 20px rgba(255, 215, 0, 0.6);
     }}
     </style>
 """, unsafe_allow_html=True)
@@ -70,14 +100,22 @@ if not st.session_state.registado:
 else:
     st.title(f"Bem-vindo, {st.session_state.nome}!")
 
-    # Verificar se o utilizador já tem um pedido na fila
-    tem_pedido_ativo = verificar_pedido_ativo(st.session_state.nome)
+    # Verificar se o utilizador está na fila e qual a posição
+    tem_pedido_ativo, posicao_fila = obter_dados_fila(st.session_state.nome)
 
     if tem_pedido_ativo:
-        st.warning("⚠️ Você já tem uma música na fila! Só poderá enviar um novo pedido assim que a sua música atual for finalizada.")
+        # Exibir o microfone gigante a girar no centro
+        st.markdown("""
+            <div class="container-mic">
+                <div class="icone-mic">🎤</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        st.warning(f"⚠️ Você já tem uma música na fila! A sua posição atual é: **{posicao_fila}º** lugar.")
+        st.info("À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.")
         
-        # Botão para atualizar a página e verificar se já foi atendido
-        if st.button("🔄 Atualizar Status"):
+        # Botão para atualizar a página e verificar a nova posição
+        if st.button("🔄 Atualizar Minha Posição"):
             st.rerun()
     else:
         # --- 1. PESQUISA NO CATÁLOGO ---
