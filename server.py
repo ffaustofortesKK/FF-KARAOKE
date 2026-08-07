@@ -77,9 +77,9 @@ st.markdown(f"""
         margin-bottom: 20px;
     }}
 
-    /* Microfone 50% maior e com rotação contínua 360° */
+    /* Microfone anterior (150px) aumentado mais 20% (150px * 1.2 = 180px) com rotação contínua 360° */
     .icone-mic {{
-        font-size: 150px;
+        font-size: 180px;
         animation: girarRelogio 4s linear infinite;
         text-shadow: 0px 0px 25px rgba(255, 215, 0, 0.8);
         display: inline-block;
@@ -101,6 +101,17 @@ st.markdown(f"""
         font-weight: bold;
         font-size: 28px;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    }}
+
+    /* Estilo personalizado para o nome do usuário: 30% maior, verde, com efeito de reflexo no chão */
+    .nome-reflexo {{
+        font-size: calc(2.2rem * 1.3);
+        font-weight: bold;
+        color: #28a745;
+        text-shadow: 0px 2px 0px rgba(40, 167, 69, 0.4), 
+                     0px 4px 0px rgba(40, 167, 69, 0.2), 
+                     0px 12px 15px rgba(0, 0, 0, 0.9);
+        margin-bottom: 20px;
     }}
 
     /* Texto em rodapé (marquee/animação contínua) com cor branca e sombra */
@@ -156,13 +167,19 @@ if not st.session_state.registado:
             st.session_state.registado = True
             st.rerun()
 else:
-    st.title(f"Bem-vindo, {st.session_state.nome}!")
+    # Título com o nome personalizado (verde, 30% maior e efeito reflexo)
+    st.markdown(f"""
+        <div>
+            <h2>Bem-vindo,</h2>
+            <div class="nome-reflexo">{st.session_state.nome}!</div>
+        </div>
+    """, unsafe_allow_html=True)
 
     # Verificar se o utilizador está na fila e qual a posição
     tem_pedido_ativo, posicao_fila = obter_dados_fila(st.session_state.nome)
 
     if tem_pedido_ativo:
-        # Exibir o microfone 50% maior a girar 360 graus em formato de relógio
+        # Exibir o microfone ampliado em 20% a girar 360 graus em formato de relógio
         st.markdown("""
             <div class="container-mic">
                 <div class="icone-mic">🎤</div>
