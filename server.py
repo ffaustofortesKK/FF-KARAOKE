@@ -62,12 +62,10 @@ st.markdown(f"""
         color: white; 
     }}
 
-    /* Estilo e Animação do Microfone a Girar */
-    @keyframes girarMicrofone {{
+    /* Animação de rotação completa em círculo (formato de relógio) */
+    @keyframes girarRelogio {{
         0% {{ transform: rotate(0deg); }}
-        25% {{ transform: rotate(10deg); }}
-        75% {{ transform: rotate(-10deg); }}
-        100% {{ transform: rotate(0deg); }}
+        100% {{ transform: rotate(360deg); }}
     }}
 
     .container-mic {{
@@ -75,14 +73,34 @@ st.markdown(f"""
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        margin-top: 30px;
-        margin-bottom: 30px;
+        margin-top: 40px;
+        margin-bottom: 20px;
     }}
 
+    /* Microfone 50% maior (100px * 1.5 = 150px) e com rotação contínua 360° */
     .icone-mic {{
-        font-size: 100px;
-        animation: girarMicrofone 3s infinite ease-in-out;
-        text-shadow: 0px 0px 20px rgba(255, 215, 0, 0.6);
+        font-size: 150px;
+        animation: girarRelogio 4s linear infinite;
+        text-shadow: 0px 0px 25px rgba(255, 215, 0, 0.8);
+        display: inline-block;
+    }}
+
+    /* Estilo para o aviso em amarelo negritado */
+    .aviso-fila {{
+        color: #FFD700;
+        font-weight: bold;
+        font-size: 22px;
+        text-align: center;
+        margin-top: 15px;
+        margin-bottom: 10px;
+    }}
+
+    /* Número da posição aumentado em 30%, branco, negritado e com sombra preta */
+    .numero-posicao {{
+        color: #FFFFFF;
+        font-weight: bold;
+        font-size: 28px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
     }}
     </style>
 """, unsafe_allow_html=True)
@@ -104,14 +122,20 @@ else:
     tem_pedido_ativo, posicao_fila = obter_dados_fila(st.session_state.nome)
 
     if tem_pedido_ativo:
-        # Exibir o microfone gigante a girar no centro
+        # Exibir o microfone 50% maior a girar 360 graus em formato de relógio
         st.markdown("""
             <div class="container-mic">
                 <div class="icone-mic">🎤</div>
             </div>
         """, unsafe_allow_html=True)
 
-        st.warning(f"⚠️ Você já tem uma música na fila! A sua posição atual é: **{posicao_fila}º** lugar.")
+        # Mensagem em amarelo negritado com o número em destaque personalizado
+        st.markdown(f"""
+            <div class="aviso-fila">
+                ⚠️ Você já tem uma música na fila! A sua posição atual é: <span class="numero-posicao">{posicao_fila}º</span> lugar.
+            </div>
+        """, unsafe_allow_html=True)
+
         st.info("À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.")
         
         # Botão para atualizar a página e verificar a nova posição
