@@ -39,7 +39,6 @@ def obter_dados_fila(nome_cantor):
         elif isinstance(dados, list):
             lista_pedidos = [i for i in dados if isinstance(i, dict)]
 
-        # Encontrar a posição (índice + 1) do utilizador na lista de pedidos
         posicao = 0
         encontrou = False
         for idx, info in enumerate(lista_pedidos):
@@ -62,7 +61,6 @@ st.markdown(f"""
         color: white; 
     }}
 
-    /* Animação de rotação completa em círculo (formato de relógio) */
     @keyframes girarRelogio {{
         0% {{ transform: rotate(0deg); }}
         100% {{ transform: rotate(360deg); }}
@@ -77,15 +75,13 @@ st.markdown(f"""
         margin-bottom: 20px;
     }}
 
-    /* Microfone anterior (150px) aumentado mais 20% (150px * 1.2 = 180px) com rotação contínua 360° */
     .icone-mic {{
-        font-size: 180px;
+        font-size: 216px; /* Aumentado 20% do anterior (180px * 1.2) */
         animation: girarRelogio 4s linear infinite;
         text-shadow: 0px 0px 25px rgba(255, 215, 0, 0.8);
         display: inline-block;
     }}
 
-    /* Estilo para o aviso em amarelo negritado */
     .aviso-fila {{
         color: #FFD700;
         font-weight: bold;
@@ -95,7 +91,6 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
 
-    /* Número da posição aumentado em 30%, branco, negritado e com sombra preta */
     .numero-posicao {{
         color: #FFFFFF;
         font-weight: bold;
@@ -103,9 +98,9 @@ st.markdown(f"""
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
     }}
 
-    /* Estilo personalizado para o nome do usuário: 30% maior, verde, com efeito de reflexo no chão */
+    /* Nome: Aumentado 40% adicional (em relação ao anterior), verde, com efeito reflexo */
     .nome-reflexo {{
-        font-size: calc(2.2rem * 1.3);
+        font-size: 4.5rem; 
         font-weight: bold;
         color: #28a745;
         text-shadow: 0px 2px 0px rgba(40, 167, 69, 0.4), 
@@ -114,7 +109,6 @@ st.markdown(f"""
         margin-bottom: 20px;
     }}
 
-    /* Texto em rodapé (marquee/animação contínua) com cor branca e sombra */
     .marquee-rodape {{
         width: 100%;
         overflow: hidden;
@@ -139,19 +133,12 @@ st.markdown(f"""
         100% {{ transform: translate(-100%, 0); }}
     }}
 
-    /* Estilização personalizada para todos os botões do Streamlit (Azul com texto branco e sombra) */
     .stButton > button {{
         background-color: #007BFF !important;
         color: #FFFFFF !important;
         font-weight: bold !important;
         border: none !important;
         text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8) !important;
-        transition: background-color 0.3s ease;
-    }}
-
-    .stButton > button:hover {{
-        background-color: #0056b3 !important;
-        color: #FFFFFF !important;
     }}
     </style>
 """, unsafe_allow_html=True)
@@ -167,7 +154,6 @@ if not st.session_state.registado:
             st.session_state.registado = True
             st.rerun()
 else:
-    # Título com o nome personalizado (verde, 30% maior e efeito reflexo)
     st.markdown(f"""
         <div>
             <h2>Bem-vindo,</h2>
@@ -175,47 +161,38 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Verificar se o utilizador está na fila e qual a posição
     tem_pedido_ativo, posicao_fila = obter_dados_fila(st.session_state.nome)
 
     if tem_pedido_ativo:
-        # Exibir o microfone ampliado em 20% a girar 360 graus em formato de relógio
         st.markdown("""
             <div class="container-mic">
                 <div class="icone-mic">🎤</div>
             </div>
         """, unsafe_allow_html=True)
 
-        # Mensagem em amarelo negritado com o número em destaque personalizado
         st.markdown(f"""
             <div class="aviso-fila">
                 ⚠️ Você já tem uma música na fila! A sua posição atual é: <span class="numero-posicao">{posicao_fila}º</span> lugar.
             </div>
         """, unsafe_allow_html=True)
 
-        # Texto em rodapé dinâmico (marquee) com cor branca e sombra
         st.markdown("""
             <div class="marquee-rodape">
                 <span>À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.</span>
             </div>
         """, unsafe_allow_html=True)
         
-        # Botão para atualizar a página e verificar a nova posição
         if st.button("🔄 Atualizar Minha Posição"):
             st.rerun()
     else:
-        # --- 1. PESQUISA NO CATÁLOGO ---
         busca = st.text_input("🔍 Pesquisar Música no catálogo:")
-
         escolha = None
         if busca:
             cat = obter_catalogo()
             resultados = [m for m in cat if busca.lower() in str(m).lower()]
-            
             if resultados:
                 escolha = st.selectbox("Selecione:", resultados)
 
-        # --- ENVIO CATALOGO ---
         if escolha:
             st.write(f"Música selecionada: **{escolha}**")
             if st.button("Confirmar Pedido"):
@@ -228,22 +205,15 @@ else:
 
         st.divider()
 
-        # --- 2. CAMPO PEDIDO MANUAL ---
-        st.subheader("Manual")
-        pedido_manual = st.text_input("Não achou? Digite o nome da música:")
+        st.subheader("PEDIDOS FORA DA LISTA DE MÚSICAS")
+        pedido_manual = st.text_input("Digite o nome da música:")
 
         if st.button("Confirmar Pedido Manual"):
             if pedido_manual and pedido_manual.strip():
-                payload = {
-                    "cantor": st.session_state.nome, 
-                    "musica": pedido_manual.strip(), 
-                    "status": "manual"
-                }
-                requests.post(URL_FIREBASE_PEDIDOS, json=payload)
+                requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": pedido_manual.strip(), "status": "manual"})
                 st.balloons()
                 st.success("O seu pedido foi enviado com sucesso!")
-                st.warning("Nota: O seu pedido foi enviado, mas nem todas as músicas existem em Karaoke.")
-                time.sleep(3)
+                time.sleep(2)
                 st.rerun()
             else:
                 st.error("Por favor, digite o nome da música.")
