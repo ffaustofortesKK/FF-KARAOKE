@@ -66,7 +66,6 @@ st.markdown(f"""
         100% {{ transform: rotate(360deg); }}
     }}
 
-    /* Animação cómica e divertida para o nome (efeito a saltitantes / balanço) */
     @keyframes comicoMover {{
         0% {{ transform: translateY(0px) rotate(0deg); }}
         25% {{ transform: translateY(-8px) rotate(-3deg); }}
@@ -107,7 +106,6 @@ st.markdown(f"""
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
     }}
 
-    /* Estilo cómico, saltitante, verde, com reflexo e emoji integrado */
     .nome-comico {{
         font-size: 4.5rem; 
         font-weight: bold;
@@ -155,6 +153,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 if 'registado' not in st.session_state: st.session_state.registado = False
+if 'mostrar_manual' not in st.session_state: st.session_state.mostrar_manual = False
 
 if not st.session_state.registado:
     st.subheader("📝 Registo Inicial")
@@ -163,9 +162,9 @@ if not st.session_state.registado:
         if nome:
             st.session_state.nome = nome
             st.session_state.registado = True
+            st.session_state.mostrar_manual = False
             st.rerun()
 else:
-    # Adicionando um emoji de microfone/cantor de forma divertida no meio/fim do nome
     nome_usuario = st.session_state.nome
     nome_com_emoji = f"🎙️ {nome_usuario} 🎶"
 
@@ -220,20 +219,29 @@ else:
 
         st.divider()
 
-        st.subheader("PEDIDOS FORA DA LISTA DE MÚSICAS")
-        pedido_manual = st.text_input("Digite o nome da música:")
+        # Botão para alternar a exibição da área de pedidos manuais
+        if st.button("Não achou pesquisa aqui!!!"):
+            st.session_state.mostrar_manual = not st.session_state.mostrar_manual
+            st.rerun()
 
-        if st.button("Confirmar Pedido Manual"):
-            if pedido_manual and pedido_manual.strip():
-                requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": pedido_manual.strip(), "status": "manual"})
-                st.balloons()
-                st.success("O seu pedido foi enviado com sucesso!")
-                time.sleep(2)
-                st.rerun()
-            else:
-                st.error("Por favor, digite o nome da música.")
+        # Se o estado for verdadeiro, exibe o bloco de pedidos manuais
+        if st.session_state.mostrar_manual:
+            st.subheader("PEDIDOS FORA DA LISTA DE MÚSICAS")
+            pedido_manual = st.text_input("Digite o nome da música:")
+
+            if st.button("Confirmar Pedido Manual"):
+                if pedido_manual and pedido_manual.strip():
+                    requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": pedido_manual.strip(), "status": "manual"})
+                    st.balloons()
+                    st.success("O seu pedido foi enviado com sucesso!")
+                    st.session_state.mostrar_manual = False
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.error("Por favor, digite o nome da música.")
 
     st.divider()
     if st.button("Sair"):
         st.session_state.registado = False
+        st.session_state.mostrar_manual = False
         st.rerun()
