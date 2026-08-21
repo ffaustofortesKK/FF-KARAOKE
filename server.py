@@ -24,7 +24,7 @@ def obter_catalogo():
         return []
 
 def obter_dados_fila(nome_cantor):
-    """Verifica se o cantor tem pedido ativo, calcula a posição e o total de músicas na fila."""
+    """Calcula a posição exata e atualizada do cliente com base na fila real."""
     try:
         resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
         dados = resp.json()
@@ -35,7 +35,6 @@ def obter_dados_fila(nome_cantor):
         if isinstance(dados, dict):
             for pedido_id, info in dados.items():
                 if isinstance(info, dict):
-                    # Guardamos também o ID do Firebase caso seja preciso apagar depois
                     info_com_id = info.copy()
                     info_com_id["firebase_id"] = pedido_id
                     lista_pedidos.append(info_com_id)
@@ -49,6 +48,7 @@ def obter_dados_fila(nome_cantor):
         posicao = 0
         encontrou = False
         for idx, info in enumerate(lista_pedidos):
+            # Compara o nome do cantor ignorando maiúsculas/minúsculas e espaços
             if info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
                 encontrou = True
                 posicao = idx + 1
@@ -220,12 +220,11 @@ else:
             </div>
         """, unsafe_allow_html=True)
         
-        # CONDICIONAL: Se houver mais de 3 músicas na fila, exibe o botão para o cliente iniciar
+        # Botão para iniciar a música do cliente se houver mais de 3 músicas na fila
         if total_fila > 3:
             st.markdown("---")
-            st.info("🔥 A fila tem mais de 3 músicas! Se desejar adiantar ou disparar o seu turno diretamente, pode usar o botão abaixo:")
+            st.info("🔥 A fila tem mais de 3 músicas! Se desejar disparar o seu turno diretamente, pode usar o botão abaixo:")
             if st.button("▶️ Iniciar a Minha Música (Cliente)", use_container_width=True):
-                # Ação executada pelo cliente: remove o pedido da nuvem para simular o início imediato
                 try:
                     resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
                     dados = resp.json()
@@ -242,7 +241,6 @@ else:
                 time.sleep(2)
                 st.rerun()
 
-        # Atualização automática a cada 4 segundos
         time.sleep(4)
         st.rerun()
         
