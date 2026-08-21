@@ -5,7 +5,6 @@ import yt_dlp
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
-URL_FIREBASE_FILA_ATUAL = "https://grupoffkaraoke-default-rtdb.firebaseio.com/fila_atual.json"
 URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
 LINK_LOGO = "https://cdn.phototourl.com/free/2026-07-03-793a0f18-6143-44c8-b56e-e44af828c30c.png"
 URL_SOM_PALMAS = "https://www.soundjay.com/misc/sounds/applause-2.mp3"
@@ -44,46 +43,52 @@ def pesquisar_youtube(termo):
 
 def verificar_estado_pedido(nome_cantor):
     """
-    Verifica se o cliente já tem pedido na fila atual do PC ou na nuvem.
-    Retorna: (estado, posicao, total_fila)
-    Estados: 'na_fila_atual', 'na_nuvem', 'nao_encontrado'
+    Verifica o estado do pedido do cliente no Firebase.
+    Procura na lista de pedidos e identifica se está pendente (na nuvem) 
+    ou se já foi integrado na fila de reprodução (atribuindo a posição real).
     """
     try:
-        # 1. Verificar se já passou para a Fila de Reprodução Atual do PC
-        resp_atual = requests.get(URL_FIREBASE_FILA_ATUAL, timeout=5)
-        dados_atual = resp_atual.json()
-        
-        if dados_atual:
-            lista_atual = []
-            if isinstance(dados_atual, dict):
-                for pid, info in dados_atual.items():
-                    if isinstance(info, dict):
-                        lista_atual.append(info)
-            elif isinstance(dados_atual, list):
-                lista_atual = [i for i in dados_atual if isinstance(i, dict)]
-                
-            for idx, info in enumerate(lista_atual):
-                if info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
-                    return "na_fila_atual", idx + 1, len(lista_atual)
-
-        # 2. Verificar se ainda está na nuvem (aguardando operador passar)
         resp_cloud = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
         dados_cloud = resp_cloud.json()
         
-        if dados_cloud:
-            lista_cloud = []
-            if isinstance(dados_cloud, dict):
-                for pid, info in dados_cloud.items():
-                    if isinstance(info, dict):
-                        lista_cloud.append(info)
-            elif isinstance(dados_cloud, list):
-                lista_cloud = [i for i in dados_cloud if isinstance(i, dict)]
-                
-            for info in lista_cloud:
-                if info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
-                    return "na_nuvem", 0, len(lista_cloud)
+        if not dados_cloud:
+            return "nao_encontrado", 0, 0
+
+        lista_pedidos = []
+        if isinstance(dados_cloud, dict):
+            for pid, info in dados_cloud.items():
+                if isinstance(info, dict):
+                    lista_pedidos.append(info)
+        elif isinstance(dados_cloud, list):
+            lista_pedidos = [i for i in dados_cloud if isinstance(i, dict)]
+
+        # Filtramos todos os pedidos que pertencem a este cantor
+        pedidos_cantor = [
+            p for p in lista_pedidos 
+            if p.get("cantor", "").strip().lower() == nome_cantor.strip().lower()
+        ]
+
+        if not pedidos_cantor:
+            return "nao_encontrado", 0, 0
+
+        # Vamos ver o primeiro pedido ativo deste cantor
+        pedido_atual = pedidos_cantor[0]
         
-        return "nao_encontrado", 0, 0
+        # O operador pode definir uma flag/status (ex: 'ativo', 'fila', 'reproduzindo') 
+        # ou podemos verificar a ordem na lista geral de pedidos.
+        status_pedido = pedido_atual.get("status_fila", "nuvem")
+
+        if status_pedido == "nuvem":
+            return "na_nuvem", 0, len(lista_pedidos)
+        else:
+            # Se já passou para a fila principal, calculamos a posição dele na lista geral ou filtrada
+            posicao = 1
+            for i, p in enumerate(lista_pedidos):
+                if p.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
+                    posicao = i + 1
+                    break
+            return "na_fila_atual", posicao, len(lista_pedidos)
+
     except:
         return "nao_encontrado", 0, 0
 
@@ -225,11 +230,11 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Verifica se já tem pedido em andamento (nuvem ou fila atual)
+    # Verifica o estado real do pedido na nuvem
     estado_pedido, posicao_fila, total_fila = verificar_estado_pedido(st.session_state.nome)
 
     if estado_pedido == "na_nuvem":
-        # Enquanto estiver na nuvem aguardando o operador
+        # Enquanto estiver na nuvem (aguardando operador)
         st.markdown(f"""
             <div class="container-mic">
                 <div class="posicao-sobre-mic">Actualizando a<br>Sua posição</div>
@@ -237,7 +242,7 @@ else:
             </div>
         """, unsafe_allow_html=True)
 
-        # Rodapé com polinhas a passar
+        # Rodapé com bolinhas em movimento
         st.markdown("""
             <div class="marquee-rodape">
                 <span>• • • • • • • • • • • • • • • • • • • • • • • • • • • • • •</span>
@@ -248,7 +253,7 @@ else:
         st.rerun()
 
     elif estado_pedido == "na_fila_atual":
-        # Quando passar para a fila de reprodução atual do PC
+        # Assim que o operador atualiza o status para fora da nuvem (ou passa para a fila)
         texto_posicao = "Você é a seguir!!!" if posicao_fila == 1 else f"{posicao_fila}º Lugar"
 
         st.markdown(f"""
@@ -260,22 +265,15 @@ else:
 
         st.markdown(f"""
             <div class="aviso-fila">
-                ✅ O seu pedido já está ativo na Fila de Reprodução Atual!
+                ✅ O seu pedido está ativo na Fila de Reprodução Atual!
             </div>
         """, unsafe_allow_html=True)
-        
-        if total_fila > 3:
-            if st.button("▶️ Iniciar a Minha Música (Cliente)", use_container_width=True):
-                st.success("Comando enviado!")
-                st.balloons()
-                time.sleep(2)
-                st.rerun()
 
         time.sleep(4)
         st.rerun()
 
     else:
-        # Se NÃO tem pedido ativo, mostra os campos de pesquisa normalmente para pedir nova música
+        # Se NÃO tem pedido ativo, mostra a pesquisa normalmente
         busca = st.text_input("🔍 Pesquisar Música no catálogo:")
         escolha = None
         if busca:
@@ -287,7 +285,11 @@ else:
         if escolha:
             st.write(f"Música selecionada: **{escolha}**")
             if st.button("Confirmar Pedido"):
-                requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": str(escolha).strip()})
+                requests.post(URL_FIREBASE_PEDIDOS, json={
+                    "cantor": st.session_state.nome, 
+                    "musica": str(escolha).strip(),
+                    "status_fila": "nuvem"  # Inicia sempre na nuvem aguardando o operador
+                })
                 st.balloons()
                 st.success("O seu pedido foi enviado com sucesso!")
                 st.audio(URL_SOM_PALMAS, autoplay=True)
@@ -315,7 +317,8 @@ else:
                     requests.post(URL_FIREBASE_PEDIDOS, json={
                         "cantor": st.session_state.nome, 
                         "musica": nome_musica_final, 
-                        "status": "manual"
+                        "status": "manual",
+                        "status_fila": "nuvem"  # Inicia na nuvem
                     })
                     
                     st.balloons()
