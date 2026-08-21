@@ -74,17 +74,23 @@ st.markdown(f"""
         100% {{ transform: translateY(0px) rotate(0deg); }}
     }}
 
+    @keyframes oscilarNumero {{
+        0% {{ transform: scale(1); }}
+        50% {{ transform: scale(1.15); }}
+        100% {{ transform: scale(1); }}
+    }}
+
     .container-mic {{
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        margin-top: 20px;
-        margin-bottom: 10px;
+        margin-top: 15px;
+        margin-bottom: 20px;
     }}
 
     .icone-mic {{
-        font-size: 180px; 
+        font-size: 216px; 
         animation: girarRelogio 4s linear infinite;
         text-shadow: 0px 0px 25px rgba(255, 215, 0, 0.8);
         display: inline-block;
@@ -93,7 +99,7 @@ st.markdown(f"""
     .aviso-fila {{
         color: #FFD700;
         font-weight: bold;
-        font-size: 22px;
+        font-size: 26px;
         text-align: center;
         margin-top: 10px;
         margin-bottom: 10px;
@@ -102,8 +108,10 @@ st.markdown(f"""
     .numero-posicao {{
         color: #FFFFFF;
         font-weight: bold;
-        font-size: 28px;
+        font-size: 39px; /* Aumentado em 40% em relação a 28px */
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+        display: inline-block;
+        animation: oscilarNumero 1.2s ease-in-out infinite;
     }}
 
     .nome-comico {{
@@ -123,15 +131,15 @@ st.markdown(f"""
         overflow: hidden;
         white-space: nowrap;
         box-sizing: border-box;
-        margin-top: 15px;
-        margin-bottom: 20px;
+        margin-top: 10px;
+        margin-bottom: 15px;
     }}
 
     .marquee-rodape span {{
         display: inline-block;
         padding-left: 100%;
         animation: marquee 15s linear infinite;
-        color: #FFFFFF;
+        color: #00ffcc;
         font-size: 16px;
         font-weight: bold;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
@@ -168,19 +176,28 @@ else:
     nome_usuario = st.session_state.nome
     nome_com_emoji = f"🎙️ {nome_usuario} 🎶"
 
+    # Verificamos logo o estado da fila para saber se exibe o painel de espera ou de escolha
     tem_pedido_ativo, posicao_fila = obter_dados_fila(st.session_state.nome)
 
-    # Se tiver pedido ativo, exibe a informação de posição e o microfone ANTES do nome de boas-vindas
     if tem_pedido_ativo:
+        # Texto Informativo do Rodapé posicionado logo acima do "Bem-vindo"
         st.markdown("""
             <div class="marquee-rodape">
-                <span>À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.</span>
+                <span>⚠️ À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.</span>
             </div>
         """, unsafe_allow_html=True)
 
         st.markdown(f"""
+            <div>
+                <h2>Bem-vindo,</h2>
+                <div class="nome-comico">{nome_com_emoji}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Aviso da fila com o número da posição oscilando e aumentado em 40% (por cima do microfone)
+        st.markdown(f"""
             <div class="aviso-fila">
-                ⚠️ Você já tem uma música na fila! A sua posição atual é: <span class="numero-posicao">{posicao_fila}º</span> lugar.
+                Você já tem uma música na fila! A sua posição atual é: <span class="numero-posicao">{posicao_fila}º</span> lugar.
             </div>
         """, unsafe_allow_html=True)
 
@@ -189,8 +206,11 @@ else:
                 <div class="icone-mic">🎤</div>
             </div>
         """, unsafe_allow_html=True)
-
-        # Atualização automática a cada 5 segundos para refletir mudanças na fila em tempo real
+        
+        if st.button("🔄 Atualizar Minha Posição"):
+            st.rerun()
+            
+        # Auto-refresh a cada 5 segundos para atualizar a posição da fila sem intervenção
         time.sleep(5)
         st.rerun()
 
@@ -222,12 +242,10 @@ else:
 
         st.divider()
 
-        # Botão para alternar a exibição da área de pedidos manuais
         if st.button("Não achou pesquisa aqui!!!"):
             st.session_state.mostrar_manual = not st.session_state.mostrar_manual
             st.rerun()
 
-        # Se o estado for verdadeiro, exibe o bloco de pedidos manuais
         if st.session_state.mostrar_manual:
             st.subheader("PEDIDOS FORA DA LISTA DE MÚSICAS")
             pedido_manual = st.text_input("Digite o nome da música:")
