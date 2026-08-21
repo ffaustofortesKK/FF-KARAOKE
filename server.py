@@ -44,8 +44,7 @@ def pesquisar_youtube(termo):
 def verificar_estado_pedido(nome_cantor):
     """
     Verifica o estado do pedido do cliente no Firebase.
-    Procura na lista de pedidos e identifica se está pendente (na nuvem) 
-    ou se já foi integrado na fila de reprodução (atribuindo a posição real).
+    Retorna: ('nao_encontrado' | 'na_nuvem' | 'na_fila_atual', posicao, total)
     """
     try:
         resp_cloud = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
@@ -71,17 +70,14 @@ def verificar_estado_pedido(nome_cantor):
         if not pedidos_cantor:
             return "nao_encontrado", 0, 0
 
-        # Vamos ver o primeiro pedido ativo deste cantor
+        # Analisa o primeiro pedido ativo deste cantor
         pedido_atual = pedidos_cantor[0]
-        
-        # O operador pode definir uma flag/status (ex: 'ativo', 'fila', 'reproduzindo') 
-        # ou podemos verificar a ordem na lista geral de pedidos.
         status_pedido = pedido_atual.get("status_fila", "nuvem")
 
         if status_pedido == "nuvem":
             return "na_nuvem", 0, len(lista_pedidos)
         else:
-            # Se já passou para a fila principal, calculamos a posição dele na lista geral ou filtrada
+            # Se já passou para a fila principal, calculamos a posição exata dele
             posicao = 1
             for i, p in enumerate(lista_pedidos):
                 if p.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
@@ -234,7 +230,7 @@ else:
     estado_pedido, posicao_fila, total_fila = verificar_estado_pedido(st.session_state.nome)
 
     if estado_pedido == "na_nuvem":
-        # Enquanto estiver na nuvem (aguardando operador)
+        # Bloqueado: Enquanto estiver na nuvem aguardando o operador aceitar
         st.markdown(f"""
             <div class="container-mic">
                 <div class="posicao-sobre-mic">Actualizando a<br>Sua posição</div>
@@ -242,7 +238,6 @@ else:
             </div>
         """, unsafe_allow_html=True)
 
-        # Rodapé com bolinhas em movimento
         st.markdown("""
             <div class="marquee-rodape">
                 <span>• • • • • • • • • • • • • • • • • • • • • • • • • • • • • •</span>
@@ -253,7 +248,7 @@ else:
         st.rerun()
 
     elif estado_pedido == "na_fila_atual":
-        # Assim que o operador atualiza o status para fora da nuvem (ou passa para a fila)
+        # Quando o operador já aceitou e passou para a fila principal do PC
         texto_posicao = "Você é a seguir!!!" if posicao_fila == 1 else f"{posicao_fila}º Lugar"
 
         st.markdown(f"""
@@ -273,7 +268,7 @@ else:
         st.rerun()
 
     else:
-        # Se NÃO tem pedido ativo, mostra a pesquisa normalmente
+        # Se NÃO tem pedido ativo, liberta a interface para pesquisar e pedir música
         busca = st.text_input("🔍 Pesquisar Música no catálogo:")
         escolha = None
         if busca:
@@ -288,7 +283,7 @@ else:
                 requests.post(URL_FIREBASE_PEDIDOS, json={
                     "cantor": st.session_state.nome, 
                     "musica": str(escolha).strip(),
-                    "status_fila": "nuvem"  # Inicia sempre na nuvem aguardando o operador
+                    "status_fila": "nuvem"  # Inicia bloqueado na nuvem aguardando validação
                 })
                 st.balloons()
                 st.success("O seu pedido foi enviado com sucesso!")
@@ -318,11 +313,11 @@ else:
                         "cantor": st.session_state.nome, 
                         "musica": nome_musica_final, 
                         "status": "manual",
-                        "status_fila": "nuvem"  # Inicia na nuvem
+                        "status_fila": "nuvem"  # Inicia bloqueado na nuvem
                     })
                     
                     st.balloons()
-                    st.warning("SEU PEDIDO FOI ENVIADO, MAIS NEM TODAS AS MUSICAS EXISTEM EM KARAOKE")
+                    st.warning("SEU PEDIDO FOI ENVIADO, MAS NEM TODAS AS MÚSICAS EXISTEM EM KARAOKE")
                     st.session_state.mostrar_manual = False
                     time.sleep(4)
                     st.rerun()
