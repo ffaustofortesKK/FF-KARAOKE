@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import time 
+import yt_dlp
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
@@ -22,6 +23,27 @@ def obter_catalogo():
         return []
     except:
         return []
+
+def pesquisar_youtube(termo):
+    """
+    Pesquisa o primeiro resultado relevante no YouTube usando yt-dlp e retorna o link e o título.
+    """
+    ydl_opts = {
+        'format': 'bestaudio',
+        'noplaylist': True,
+        'quiet': True,
+        'no_warnings': True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Executa a pesquisa baseada em texto no YouTube
+            info = ydl.extract_info(f"ytsearch1:{termo}", download=False)
+            if 'entries' in info and len(info['entries']) > 0:
+                entry = info['entries'][0]
+                return entry.get('webpage_url'), entry.get('title')
+    except:
+        pass
+    return None, None
 
 def verificar_estado_pedido(nome_cantor):
     try:
@@ -217,21 +239,33 @@ else:
 
         st.divider()
 
-        if st.button("Não achou pesquisa aqui!!!"):
+        if st.button("Não achou clica aqui!!"):
             st.session_state.mostrar_manual = not st.session_state.mostrar_manual
             st.rerun()
 
         if st.session_state.mostrar_manual:
-            st.subheader("PEDIDOS FORA DA LISTA DE MÚSICAS")
-            pedido_manual = st.text_input("Digite o nome da música:")
+            st.subheader("🎵 PEDIDOS FORA DA LISTA DE MÚSICAS")
+            pedido_manual = st.text_input("Digite o nome da música que pretende cantar:")
 
-            if st.button("Confirmar Pedido Manual"):
+            if st.button("Enviar Pedido Manual"):
                 if pedido_manual and pedido_manual.strip():
-                    requests.post(URL_FIREBASE_PEDIDOS, json={"cantor": st.session_state.nome, "musica": pedido_manual.strip(), "status": "manual"})
+                    with st.spinner("A pesquisar link correspondente no YouTube..."):
+                        url_yt, titulo_yt = pesquisar_youtube(pedido_manual.strip())
+                    
+                    link_final = url_yt if url_yt else "Link não encontrado automaticamente"
+                    nome_musica_final = f"{pedido_manual.strip()} (YT: {link_final})"
+
+                    # Envia para a nuvem
+                    requests.post(URL_FIREBASE_PEDIDOS, json={
+                        "cantor": st.session_state.nome, 
+                        "musica": nome_musica_final, 
+                        "status": "manual"
+                    })
+                    
                     st.balloons()
-                    st.success("O seu pedido foi enviado com sucesso!")
+                    st.warning("SEU PEDIDO FOI ENVIADO, MAIS NEM TODAS AS MUSICAS EXISTEM EM KARAOKE")
                     st.session_state.mostrar_manual = False
-                    time.sleep(2)
+                    time.sleep(4)
                     st.rerun()
                 else:
                     st.error("Por favor, digite o nome da música.")
