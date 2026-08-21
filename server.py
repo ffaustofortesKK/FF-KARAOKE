@@ -24,20 +24,27 @@ def obter_catalogo():
         return []
 
 def obter_dados_fila(nome_cantor):
-    """Verifica se o cantor tem pedido ativo e calcula a sua posição exata na fila."""
+    """Verifica se o cantor tem pedido ativo, calcula a posição e o total de músicas na fila."""
     try:
         resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
         dados = resp.json()
         if not dados:
-            return False, 0
+            return False, 0, 0
         
         lista_pedidos = []
         if isinstance(dados, dict):
             for pedido_id, info in dados.items():
                 if isinstance(info, dict):
-                    lista_pedidos.append(info)
+                    # Guardamos também o ID do Firebase caso seja preciso apagar depois
+                    info_com_id = info.copy()
+                    info_com_id["firebase_id"] = pedido_id
+                    lista_pedidos.append(info_com_id)
         elif isinstance(dados, list):
-            lista_pedidos = [i for i in dados if isinstance(i, dict)]
+            for idx_l, i in enumerate(dados):
+                if isinstance(i, dict):
+                    info_com_id = i.copy()
+                    info_com_id["firebase_id"] = str(idx_l)
+                    lista_pedidos.append(info_com_id)
 
         posicao = 0
         encontrou = False
@@ -47,9 +54,9 @@ def obter_dados_fila(nome_cantor):
                 posicao = idx + 1
                 break
                 
-        return encontrou, posicao
+        return encontrou, posicao, len(lista_pedidos)
     except:
-        return False, 0
+        return False, 0, 0
 
 st.markdown(f"""
     <style>
@@ -103,7 +110,7 @@ st.markdown(f"""
         z-index: 10;
         color: #FFD700;
         font-weight: bold;
-        font-size: 3.92rem; /* Aumentado cerca de 40% */
+        font-size: 3.92rem;
         text-align: center;
         text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.9);
         animation: oscilarTexto 1.2s ease-in-out infinite;
@@ -176,7 +183,6 @@ if not st.session_state.registado:
             st.session_state.mostrar_manual = False
             st.rerun()
 else:
-    # Rodapé posicionado por cima do texto Bem-vindo
     st.markdown("""
         <div class="marquee-topo">
             <span>À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.</span>
@@ -193,10 +199,9 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    tem_pedido_ativo, posicao_fila = obter_dados_fila(st.session_state.nome)
+    tem_pedido_ativo, posicao_fila, total_fila = obter_dados_fila(st.session_state.nome)
 
     if tem_pedido_ativo:
-        # Texto condicional se for o próximo (posição 1 significa que está na cabeça da fila, logo falta 1 ou é o atual)
         if posicao_fila == 1:
             texto_posicao = "Você é a seguir!!!"
         else:
@@ -211,11 +216,33 @@ else:
 
         st.markdown(f"""
             <div class="aviso-fila">
-                ⚠️ O seu pedido está ativo na fila de reprodução.
+                ⚠️ O seu pedido está ativo na fila de reprodução (Total na fila: {total_fila}).
             </div>
         """, unsafe_allow_html=True)
         
-        # Atualização automática a cada 4 segundos para refletir remoções feitas pelo operador
+        # CONDICIONAL: Se houver mais de 3 músicas na fila, exibe o botão para o cliente iniciar
+        if total_fila > 3:
+            st.markdown("---")
+            st.info("🔥 A fila tem mais de 3 músicas! Se desejar adiantar ou disparar o seu turno diretamente, pode usar o botão abaixo:")
+            if st.button("▶️ Iniciar a Minha Música (Cliente)", use_container_width=True):
+                # Ação executada pelo cliente: remove o pedido da nuvem para simular o início imediato
+                try:
+                    resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
+                    dados = resp.json()
+                    if isinstance(dados, dict):
+                        for pid, pinfo in dados.items():
+                            if isinstance(pinfo, dict) and pinfo.get("cantor", "").strip().lower() == st.session_state.nome.strip().lower():
+                                requests.delete(f"https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos/{pid}.json")
+                                break
+                except:
+                    pass
+                
+                st.success("Comando enviado! A sua música foi acionada.")
+                st.balloons()
+                time.sleep(2)
+                st.rerun()
+
+        # Atualização automática a cada 4 segundos
         time.sleep(4)
         st.rerun()
         
