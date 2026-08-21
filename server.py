@@ -79,12 +79,12 @@ st.markdown(f"""
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        margin-top: 40px;
-        margin-bottom: 20px;
+        margin-top: 20px;
+        margin-bottom: 10px;
     }}
 
     .icone-mic {{
-        font-size: 216px; 
+        font-size: 180px; 
         animation: girarRelogio 4s linear infinite;
         text-shadow: 0px 0px 25px rgba(255, 215, 0, 0.8);
         display: inline-block;
@@ -95,7 +95,7 @@ st.markdown(f"""
         font-weight: bold;
         font-size: 22px;
         text-align: center;
-        margin-top: 15px;
+        margin-top: 10px;
         margin-bottom: 10px;
     }}
 
@@ -123,7 +123,7 @@ st.markdown(f"""
         overflow: hidden;
         white-space: nowrap;
         box-sizing: border-box;
-        margin-top: 30px;
+        margin-top: 15px;
         margin-bottom: 20px;
     }}
 
@@ -168,19 +168,13 @@ else:
     nome_usuario = st.session_state.nome
     nome_com_emoji = f"🎙️ {nome_usuario} 🎶"
 
-    st.markdown(f"""
-        <div>
-            <h2>Bem-vindo,</h2>
-            <div class="nome-comico">{nome_com_emoji}</div>
-        </div>
-    """, unsafe_allow_html=True)
-
     tem_pedido_ativo, posicao_fila = obter_dados_fila(st.session_state.nome)
 
+    # Se tiver pedido ativo, exibe a informação de posição e o microfone ANTES do nome de boas-vindas
     if tem_pedido_ativo:
         st.markdown("""
-            <div class="container-mic">
-                <div class="icone-mic">🎤</div>
+            <div class="marquee-rodape">
+                <span>À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.</span>
             </div>
         """, unsafe_allow_html=True)
 
@@ -191,14 +185,23 @@ else:
         """, unsafe_allow_html=True)
 
         st.markdown("""
-            <div class="marquee-rodape">
-                <span>À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.</span>
+            <div class="container-mic">
+                <div class="icone-mic">🎤</div>
             </div>
         """, unsafe_allow_html=True)
-        
-        if st.button("🔄 Atualizar Minha Posição"):
-            st.rerun()
+
+        # Atualização automática a cada 5 segundos para refletir mudanças na fila em tempo real
+        time.sleep(5)
+        st.rerun()
+
     else:
+        st.markdown(f"""
+            <div>
+                <h2>Bem-vindo,</h2>
+                <div class="nome-comico">{nome_com_emoji}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
         busca = st.text_input("🔍 Pesquisar Música no catálogo:")
         escolha = None
         if busca:
