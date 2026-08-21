@@ -74,9 +74,9 @@ st.markdown(f"""
         100% {{ transform: translateY(0px) rotate(0deg); }}
     }}
 
-    @keyframes oscilarNumero {{
+    @keyframes oscilarTexto {{
         0% {{ transform: scale(1); }}
-        50% {{ transform: scale(1.15); }}
+        50% {{ transform: scale(1.08); }}
         100% {{ transform: scale(1); }}
     }}
 
@@ -85,8 +85,9 @@ st.markdown(f"""
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        margin-top: 15px;
+        margin-top: 20px;
         margin-bottom: 20px;
+        position: relative;
     }}
 
     .icone-mic {{
@@ -96,22 +97,25 @@ st.markdown(f"""
         display: inline-block;
     }}
 
+    .posicao-sobre-mic {{
+        position: absolute;
+        top: 35%;
+        z-index: 10;
+        color: #FFD700;
+        font-weight: bold;
+        font-size: 3.92rem; /* Aumentado cerca de 40% */
+        text-align: center;
+        text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.9);
+        animation: oscilarTexto 1.2s ease-in-out infinite;
+    }}
+
     .aviso-fila {{
         color: #FFD700;
         font-weight: bold;
-        font-size: 26px;
+        font-size: 24px;
         text-align: center;
-        margin-top: 10px;
+        margin-top: 5px;
         margin-bottom: 10px;
-    }}
-
-    .numero-posicao {{
-        color: #FFFFFF;
-        font-weight: bold;
-        font-size: 39px; /* Aumentado em 40% em relação a 28px */
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
-        display: inline-block;
-        animation: oscilarNumero 1.2s ease-in-out infinite;
     }}
 
     .nome-comico {{
@@ -123,19 +127,18 @@ st.markdown(f"""
         text-shadow: 0px 2px 0px rgba(40, 167, 69, 0.4), 
                      0px 4px 0px rgba(40, 167, 69, 0.2), 
                      0px 12px 15px rgba(0, 0, 0, 0.9);
-        margin-bottom: 20px;
+        margin-bottom: 10px;
     }}
 
-    .marquee-rodape {{
+    .marquee-topo {{
         width: 100%;
         overflow: hidden;
         white-space: nowrap;
         box-sizing: border-box;
-        margin-top: 10px;
         margin-bottom: 15px;
     }}
 
-    .marquee-rodape span {{
+    .marquee-topo span {{
         display: inline-block;
         padding-left: 100%;
         animation: marquee 15s linear infinite;
@@ -173,55 +176,50 @@ if not st.session_state.registado:
             st.session_state.mostrar_manual = False
             st.rerun()
 else:
+    # Rodapé posicionado por cima do texto Bem-vindo
+    st.markdown("""
+        <div class="marquee-topo">
+            <span>À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.</span>
+        </div>
+    """, unsafe_allow_html=True)
+
     nome_usuario = st.session_state.nome
     nome_com_emoji = f"🎙️ {nome_usuario} 🎶"
 
-    # Verificamos logo o estado da fila para saber se exibe o painel de espera ou de escolha
+    st.markdown(f"""
+        <div>
+            <h2>Bem-vindo,</h2>
+            <div class="nome-comico">{nome_com_emoji}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
     tem_pedido_ativo, posicao_fila = obter_dados_fila(st.session_state.nome)
 
     if tem_pedido_ativo:
-        # Texto Informativo do Rodapé posicionado logo acima do "Bem-vindo"
-        st.markdown("""
-            <div class="marquee-rodape">
-                <span>⚠️ À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.</span>
-            </div>
-        """, unsafe_allow_html=True)
+        # Texto condicional se for o próximo (posição 1 significa que está na cabeça da fila, logo falta 1 ou é o atual)
+        if posicao_fila == 1:
+            texto_posicao = "Você é a seguir!!!"
+        else:
+            texto_posicao = f"{posicao_fila}º Lugar"
 
         st.markdown(f"""
-            <div>
-                <h2>Bem-vindo,</h2>
-                <div class="nome-comico">{nome_com_emoji}</div>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Aviso da fila com o número da posição oscilando e aumentado em 40% (por cima do microfone)
-        st.markdown(f"""
-            <div class="aviso-fila">
-                Você já tem uma música na fila! A sua posição atual é: <span class="numero-posicao">{posicao_fila}º</span> lugar.
-            </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("""
             <div class="container-mic">
+                <div class="posicao-sobre-mic">{texto_posicao}</div>
                 <div class="icone-mic">🎤</div>
             </div>
         """, unsafe_allow_html=True)
-        
-        if st.button("🔄 Atualizar Minha Posição"):
-            st.rerun()
-            
-        # Auto-refresh a cada 5 segundos para atualizar a posição da fila sem intervenção
-        time.sleep(5)
-        st.rerun()
 
-    else:
         st.markdown(f"""
-            <div>
-                <h2>Bem-vindo,</h2>
-                <div class="nome-comico">{nome_com_emoji}</div>
+            <div class="aviso-fila">
+                ⚠️ O seu pedido está ativo na fila de reprodução.
             </div>
         """, unsafe_allow_html=True)
-
+        
+        # Atualização automática a cada 4 segundos para refletir remoções feitas pelo operador
+        time.sleep(4)
+        st.rerun()
+        
+    else:
         busca = st.text_input("🔍 Pesquisar Música no catálogo:")
         escolha = None
         if busca:
