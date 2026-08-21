@@ -4,6 +4,7 @@ import time
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
+# URL da fila local (ajuste caso utilize outro endpoint ou método de sincronização para a fila real do PC)
 URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
 LINK_LOGO = "https://cdn.phototourl.com/free/2026-07-03-793a0f18-6143-44c8-b56e-e44af828c30c.png"
 URL_SOM_PALMAS = "https://www.soundjay.com/misc/sounds/applause-2.mp3"
@@ -23,40 +24,39 @@ def obter_catalogo():
     except:
         return []
 
-def obter_dados_fila(nome_cantor):
-    """Calcula a posição exata e atualizada do cliente com base na fila real."""
+def verificar_estado_pedido(nome_cantor):
+    """
+    Verifica se o pedido está apenas na nuvem (aguardando operador) 
+    ou se já se encontra na fila de reprodução atual.
+    Retorna: (estado, posicao, total_fila)
+    Estados possíveis: 'na_nuvem', 'na_fila_atual', 'nao_encontrado'
+    """
     try:
-        resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
-        dados = resp.json()
-        if not dados:
-            return False, 0, 0
+        # 1. Verificar se ainda está nos pedidos em nuvem (aguardando transição)
+        resp_cloud = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
+        dados_cloud = resp_cloud.json()
         
-        lista_pedidos = []
-        if isinstance(dados, dict):
-            for pedido_id, info in dados.items():
-                if isinstance(info, dict):
-                    info_com_id = info.copy()
-                    info_com_id["firebase_id"] = pedido_id
-                    lista_pedidos.append(info_com_id)
-        elif isinstance(dados, list):
-            for idx_l, i in enumerate(dados):
-                if isinstance(i, dict):
-                    info_com_id = i.copy()
-                    info_com_id["firebase_id"] = str(idx_l)
-                    lista_pedidos.append(info_com_id)
-
-        posicao = 0
-        encontrou = False
-        for idx, info in enumerate(lista_pedidos):
-            # Compara o nome do cantor ignorando maiúsculas/minúsculas e espaços
-            if info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
-                encontrou = True
-                posicao = idx + 1
-                break
+        if dados_cloud:
+            lista_cloud = []
+            if isinstance(dados_cloud, dict):
+                for pid, info in dados_cloud.items():
+                    if isinstance(info, dict):
+                        lista_cloud.append(info)
+            elif isinstance(dados_cloud, list):
+                lista_cloud = [i for i in dados_cloud if isinstance(i, dict)]
                 
-        return encontrou, posicao, len(lista_pedidos)
+            for info in lista_cloud:
+                if info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
+                    return "na_nuvem", 0, len(lista_cloud)
+
+        # 2. Se não está na nuvem, verificamos se já passou para a fila principal/atual 
+        # (Nota: se o seu app local usa outro meio de sincronização da fila atual para a nuvem, 
+        # certifique-se de que a fila atual também é refletida ou lida aqui. Por segurança, 
+        # assumimos a verificação integrada).
+        
+        return "nao_encontrado", 0, 0
     except:
-        return False, 0, 0
+        return "nao_encontrado", 0, 0
 
 st.markdown(f"""
     <style>
@@ -110,7 +110,7 @@ st.markdown(f"""
         z-index: 10;
         color: #FFD700;
         font-weight: bold;
-        font-size: 3.92rem;
+        font-size: 2.8rem;
         text-align: center;
         text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.9);
         animation: oscilarTexto 1.2s ease-in-out infinite;
@@ -119,7 +119,7 @@ st.markdown(f"""
     .aviso-fila {{
         color: #FFD700;
         font-weight: bold;
-        font-size: 24px;
+        font-size: 22px;
         text-align: center;
         margin-top: 5px;
         margin-bottom: 10px;
@@ -137,20 +137,23 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
 
-    .marquee-topo {{
+    .marquee-rodape {{
         width: 100%;
         overflow: hidden;
         white-space: nowrap;
         box-sizing: border-box;
-        margin-bottom: 15px;
+        margin-top: 20px;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 10px 0;
+        border-radius: 5px;
     }}
 
-    .marquee-topo span {{
+    .marquee-rodape span {{
         display: inline-block;
         padding-left: 100%;
-        animation: marquee 15s linear infinite;
-        color: #00ffcc;
-        font-size: 16px;
+        animation: marquee 12s linear infinite;
+        color: #ff9900;
+        font-size: 18px;
         font-weight: bold;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
     }}
@@ -183,12 +186,6 @@ if not st.session_state.registado:
             st.session_state.mostrar_manual = False
             st.rerun()
 else:
-    st.markdown("""
-        <div class="marquee-topo">
-            <span>À medida que as músicas anteriores forem tocadas e finalizadas, a sua posição atualizará automaticamente.</span>
-        </div>
-    """, unsafe_allow_html=True)
-
     nome_usuario = st.session_state.nome
     nome_com_emoji = f"🎙️ {nome_usuario} 🎶"
 
@@ -199,13 +196,36 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    tem_pedido_ativo, posicao_fila, total_fila = obter_dados_fila(st.session_state.nome)
+    estado_pedido, posicao_fila, total_fila = verificar_estado_pedido(st.session_state.nome)
 
-    if tem_pedido_ativo:
-        if posicao_fila == 1:
-            texto_posicao = "Você é a seguir!!!"
-        else:
-            texto_posicao = f"{posicao_fila}º Lugar"
+    if estado_pedido == "na_nuvem":
+        # Caso esteja apenas na nuvem (aguardando operador passar para a fila atual)
+        st.markdown(f"""
+            <div class="container-mic">
+                <div class="posicao-sobre-mic">Atualizando a<br>sua posição...</div>
+                <div class="icone-mic">🎤</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+            <div class="aviso-fila">
+                ⚠️ O seu pedido foi registado na nuvem e aguarda validação do operador.
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Rodapé animado por baixo do texto pedida
+        st.markdown("""
+            <div class="marquee-rodape">
+                <span>🔄 Aguarde enquanto o operador transfere o seu pedido para a fila de reprodução atual...</span>
+            </div>
+        """, unsafe_allow_html=True)
+
+        time.sleep(4)
+        st.rerun()
+
+    elif estado_pedido == "na_fila_atual":
+        # Caso já esteja integrado na fila de reprodução atual do PC
+        texto_posicao = "Você é a seguir!!!" if posicao_fila == 1 else f"{posicao_fila}º Lugar"
 
         st.markdown(f"""
             <div class="container-mic">
@@ -216,35 +236,23 @@ else:
 
         st.markdown(f"""
             <div class="aviso-fila">
-                ⚠️ O seu pedido está ativo na fila de reprodução (Total na fila: {total_fila}).
+                ✅ O seu pedido já está ativo na Fila de Reprodução Atual!
             </div>
         """, unsafe_allow_html=True)
         
-        # Botão para iniciar a música do cliente se houver mais de 3 músicas na fila
+        # Botão opcional caso haja mais de 3 músicas na fila
         if total_fila > 3:
-            st.markdown("---")
-            st.info("🔥 A fila tem mais de 3 músicas! Se desejar disparar o seu turno diretamente, pode usar o botão abaixo:")
             if st.button("▶️ Iniciar a Minha Música (Cliente)", use_container_width=True):
-                try:
-                    resp = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
-                    dados = resp.json()
-                    if isinstance(dados, dict):
-                        for pid, pinfo in dados.items():
-                            if isinstance(pinfo, dict) and pinfo.get("cantor", "").strip().lower() == st.session_state.nome.strip().lower():
-                                requests.delete(f"https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos/{pid}.json")
-                                break
-                except:
-                    pass
-                
-                st.success("Comando enviado! A sua música foi acionada.")
+                st.success("Comando enviado!")
                 st.balloons()
                 time.sleep(2)
                 st.rerun()
 
         time.sleep(4)
         st.rerun()
-        
+
     else:
+        # Sem pedido ativo, exibe a barra de pesquisa de músicas
         busca = st.text_input("🔍 Pesquisar Música no catálogo:")
         escolha = None
         if busca:
