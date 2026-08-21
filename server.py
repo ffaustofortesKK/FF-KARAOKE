@@ -4,7 +4,6 @@ import time
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
-# URL da fila local (ajuste caso utilize outro endpoint ou método de sincronização para a fila real do PC)
 URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
 LINK_LOGO = "https://cdn.phototourl.com/free/2026-07-03-793a0f18-6143-44c8-b56e-e44af828c30c.png"
 URL_SOM_PALMAS = "https://www.soundjay.com/misc/sounds/applause-2.mp3"
@@ -25,14 +24,7 @@ def obter_catalogo():
         return []
 
 def verificar_estado_pedido(nome_cantor):
-    """
-    Verifica se o pedido está apenas na nuvem (aguardando operador) 
-    ou se já se encontra na fila de reprodução atual.
-    Retorna: (estado, posicao, total_fila)
-    Estados possíveis: 'na_nuvem', 'na_fila_atual', 'nao_encontrado'
-    """
     try:
-        # 1. Verificar se ainda está nos pedidos em nuvem (aguardando transição)
         resp_cloud = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
         dados_cloud = resp_cloud.json()
         
@@ -48,11 +40,6 @@ def verificar_estado_pedido(nome_cantor):
             for info in lista_cloud:
                 if info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
                     return "na_nuvem", 0, len(lista_cloud)
-
-        # 2. Se não está na nuvem, verificamos se já passou para a fila principal/atual 
-        # (Nota: se o seu app local usa outro meio de sincronização da fila atual para a nuvem, 
-        # certifique-se de que a fila atual também é refletida ou lida aqui. Por segurança, 
-        # assumimos a verificação integrada).
         
         return "nao_encontrado", 0, 0
     except:
@@ -137,32 +124,6 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
 
-    .marquee-rodape {{
-        width: 100%;
-        overflow: hidden;
-        white-space: nowrap;
-        box-sizing: border-box;
-        margin-top: 20px;
-        background: rgba(0, 0, 0, 0.6);
-        padding: 10px 0;
-        border-radius: 5px;
-    }}
-
-    .marquee-rodape span {{
-        display: inline-block;
-        padding-left: 100%;
-        animation: marquee 12s linear infinite;
-        color: #ff9900;
-        font-size: 18px;
-        font-weight: bold;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
-    }}
-
-    @keyframes marquee {{
-        0%   {{ transform: translate(0, 0); }}
-        100% {{ transform: translate(-100%, 0); }}
-    }}
-
     .stButton > button {{
         background-color: #007BFF !important;
         color: #FFFFFF !important;
@@ -199,7 +160,6 @@ else:
     estado_pedido, posicao_fila, total_fila = verificar_estado_pedido(st.session_state.nome)
 
     if estado_pedido == "na_nuvem":
-        # Caso esteja apenas na nuvem (aguardando operador passar para a fila atual)
         st.markdown(f"""
             <div class="container-mic">
                 <div class="posicao-sobre-mic">Atualizando a<br>sua posição...</div>
@@ -207,24 +167,10 @@ else:
             </div>
         """, unsafe_allow_html=True)
 
-        st.markdown(f"""
-            <div class="aviso-fila">
-                ⚠️ O seu pedido foi registado na nuvem e aguarda validação do operador.
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Rodapé animado por baixo do texto pedida
-        st.markdown("""
-            <div class="marquee-rodape">
-                <span>🔄 Aguarde enquanto o operador transfere o seu pedido para a fila de reprodução atual...</span>
-            </div>
-        """, unsafe_allow_html=True)
-
         time.sleep(4)
         st.rerun()
 
     elif estado_pedido == "na_fila_atual":
-        # Caso já esteja integrado na fila de reprodução atual do PC
         texto_posicao = "Você é a seguir!!!" if posicao_fila == 1 else f"{posicao_fila}º Lugar"
 
         st.markdown(f"""
@@ -240,7 +186,6 @@ else:
             </div>
         """, unsafe_allow_html=True)
         
-        # Botão opcional caso haja mais de 3 músicas na fila
         if total_fila > 3:
             if st.button("▶️ Iniciar a Minha Música (Cliente)", use_container_width=True):
                 st.success("Comando enviado!")
@@ -252,7 +197,6 @@ else:
         st.rerun()
 
     else:
-        # Sem pedido ativo, exibe a barra de pesquisa de músicas
         busca = st.text_input("🔍 Pesquisar Música no catálogo:")
         escolha = None
         if busca:
