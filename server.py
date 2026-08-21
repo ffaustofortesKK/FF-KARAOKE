@@ -5,6 +5,7 @@ import yt_dlp
 
 # --- CONFIGURAÇÕES ---
 URL_FIREBASE_PEDIDOS = "https://grupoffkaraoke-default-rtdb.firebaseio.com/pedidos.json"
+URL_FIREBASE_FILA_ATUAL = "https://grupoffkaraoke-default-rtdb.firebaseio.com/fila_atual.json"
 URL_FIREBASE_CATALOGO = "https://grupoffkaraoke-default-rtdb.firebaseio.com/catalogo.json"
 LINK_LOGO = "https://cdn.phototourl.com/free/2026-07-03-793a0f18-6143-44c8-b56e-e44af828c30c.png"
 URL_SOM_PALMAS = "https://www.soundjay.com/misc/sounds/applause-2.mp3"
@@ -25,9 +26,6 @@ def obter_catalogo():
         return []
 
 def pesquisar_youtube(termo):
-    """
-    Pesquisa o primeiro resultado relevante no YouTube usando yt-dlp e retorna o link e o título.
-    """
     ydl_opts = {
         'format': 'bestaudio',
         'noplaylist': True,
@@ -36,7 +34,6 @@ def pesquisar_youtube(termo):
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Executa a pesquisa baseada em texto no YouTube
             info = ydl.extract_info(f"ytsearch1:{termo}", download=False)
             if 'entries' in info and len(info['entries']) > 0:
                 entry = info['entries'][0]
@@ -46,7 +43,30 @@ def pesquisar_youtube(termo):
     return None, None
 
 def verificar_estado_pedido(nome_cantor):
+    """
+    Verifica se o cliente já tem pedido na fila atual do PC ou na nuvem.
+    Retorna: (estado, posicao, total_fila)
+    Estados: 'na_fila_atual', 'na_nuvem', 'nao_encontrado'
+    """
     try:
+        # 1. Verificar se já passou para a Fila de Reprodução Atual do PC
+        resp_atual = requests.get(URL_FIREBASE_FILA_ATUAL, timeout=5)
+        dados_atual = resp_atual.json()
+        
+        if dados_atual:
+            lista_atual = []
+            if isinstance(dados_atual, dict):
+                for pid, info in dados_atual.items():
+                    if isinstance(info, dict):
+                        lista_atual.append(info)
+            elif isinstance(dados_atual, list):
+                lista_atual = [i for i in dados_atual if isinstance(i, dict)]
+                
+            for idx, info in enumerate(lista_atual):
+                if info.get("cantor", "").strip().lower() == nome_cantor.strip().lower():
+                    return "na_fila_atual", idx + 1, len(lista_atual)
+
+        # 2. Verificar se ainda está na nuvem (aguardando operador passar)
         resp_cloud = requests.get(URL_FIREBASE_PEDIDOS, timeout=5)
         dados_cloud = resp_cloud.json()
         
@@ -146,6 +166,32 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
 
+    .marquee-rodape {{
+        width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        box-sizing: border-box;
+        margin-top: 20px;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 10px 0;
+        border-radius: 5px;
+    }}
+
+    .marquee-rodape span {{
+        display: inline-block;
+        padding-left: 100%;
+        animation: marquee 12s linear infinite;
+        color: #00ffcc;
+        font-size: 18px;
+        font-weight: bold;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    }}
+
+    @keyframes marquee {{
+        0%   {{ transform: translate(0, 0); }}
+        100% {{ transform: translate(-100%, 0); }}
+    }}
+
     .stButton > button {{
         background-color: #007BFF !important;
         color: #FFFFFF !important;
@@ -179,13 +225,22 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
+    # Verifica se já tem pedido em andamento (nuvem ou fila atual)
     estado_pedido, posicao_fila, total_fila = verificar_estado_pedido(st.session_state.nome)
 
     if estado_pedido == "na_nuvem":
+        # Enquanto estiver na nuvem aguardando o operador
         st.markdown(f"""
             <div class="container-mic">
-                <div class="posicao-sobre-mic">Atualizando a<br>sua posição...</div>
+                <div class="posicao-sobre-mic">Actualizando a<br>Sua posição</div>
                 <div class="icone-mic">🎤</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Rodapé com polinhas a passar
+        st.markdown("""
+            <div class="marquee-rodape">
+                <span>• • • • • • • • • • • • • • • • • • • • • • • • • • • • • •</span>
             </div>
         """, unsafe_allow_html=True)
 
@@ -193,6 +248,7 @@ else:
         st.rerun()
 
     elif estado_pedido == "na_fila_atual":
+        # Quando passar para a fila de reprodução atual do PC
         texto_posicao = "Você é a seguir!!!" if posicao_fila == 1 else f"{posicao_fila}º Lugar"
 
         st.markdown(f"""
@@ -219,6 +275,7 @@ else:
         st.rerun()
 
     else:
+        # Se NÃO tem pedido ativo, mostra os campos de pesquisa normalmente para pedir nova música
         busca = st.text_input("🔍 Pesquisar Música no catálogo:")
         escolha = None
         if busca:
@@ -255,7 +312,6 @@ else:
                     link_final = url_yt if url_yt else "Link não encontrado automaticamente"
                     nome_musica_final = f"{pedido_manual.strip()} (YT: {link_final})"
 
-                    # Envia para a nuvem
                     requests.post(URL_FIREBASE_PEDIDOS, json={
                         "cantor": st.session_state.nome, 
                         "musica": nome_musica_final, 
